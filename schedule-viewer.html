@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#e8820c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="スケジュール">
+<title>フジテック スケジュール（閲覧）</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #1a1a1a; color: #e8e0d0;
+    font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', sans-serif;
+    overflow-x: hidden;
+  }
+  #viewer-loading {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    gap: 14px; background: #1a1a1a; z-index: 9999;
+    font-size: 1rem; color: #e8820c;
+  }
+  .viewer-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #444; border-top-color: #e8820c;
+    border-radius: 50%; animation: __viewer_spin 0.8s linear infinite;
+  }
+  @keyframes __viewer_spin { to { transform: rotate(360deg); } }
+  #viewer-error {
+    position: fixed; top: 12px; left: 12px; right: 12px;
+    padding: 10px 14px; background: #c0392b; color: #fff;
+    border-radius: 6px; display: none; z-index: 9998;
+    font-size: .85rem; box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  }
+  #viewer-last-update {
+    position: fixed; bottom: 6px; right: 10px;
+    font-size: .65rem; color: #aaa;
+    background: rgba(0,0,0,.55); padding: 3px 7px; border-radius: 4px;
+    z-index: 100; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div id="viewer-loading">
+    <div class="viewer-spinner"></div>
+    <span>スケジュールを読み込み中...</span>
+  </div>
+  <div id="viewer-error"></div>
+
+  <!-- カレンダー描画先 -->
+  <div id="schedule-root"></div>
+
+  <div id="viewer-last-update"></div>
+
+  <script>
+    /* ===================================================================
+     * ⚠ 設定: GAS WebApp の URL を貼り付けてください (末尾は /exec)
+     * =================================================================== */
+    window.SCHEDULE_VIEWER_MODE = true;
+    window.SCHEDULE_VIEWER_GAS_URL = 'https://script.google.com/macros/s/__YOUR_DEPLOYMENT_ID__/exec';
+
+    /* 自動リロード間隔 (ミリ秒) */
+    var AUTO_RELOAD_MS = 10 * 60 * 1000; // 10分
+
+    /* -------------------------------------------------------------------
+     * kintone API のモック
+     * 共通JSは kintone.events.on / kintone.api / kintone.getLoginUser を
+     * 参照するため、最小限の実装で代用する。
+     * 実際のデータ取得は schedule-customize4-3.js 内の kintoneApiCall
+     * (VIEWER_MODE分岐) で window.SCHEDULE_VIEWER_GAS_URL に fetch する。
+     * ------------------------------------------------------------------- */
+    var __handlers = {};
+    window.kintone = {
+      events: { on: function (name, handler) { __handlers[name] = handler; } },
+      api: function () { return Promise.resolve({}); },
+      app: { getId: function () { return 160; } },
+      getLoginUser: function () { return { code: '', name: '閲覧' }; }
+    };
+    window.kintone.api.url = function (p) { return p; };
+  </script>
+
+  <!-- 共通スケジュールロジック (kintoneカスタマイズと同じファイル) -->
+  <script src="schedule-customize4-3.js"></script>
+
+  <script>
+    function showViewerError(msg) {
+      var el = document.getElementById('viewer-error');
+      if (!el) return;
+      el.textContent = '⚠️ ' + msg;
+      el.style.display = 'block';
+      setTimeout(function () { el.style.display = 'none'; }, 10000);
+    }
+
+    function updateLastUpdateLabel() {
+      var el = document.getElementById('viewer-last-update');
+      if (!el) return;
+      var now = new Date();
+      el.textContent = '最終更新: ' + now.toLocaleString('ja-JP', {
+        month: 'numeric', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    /* GAS URL未設定チェック */
+    if (window.SCHEDULE_VIEWER_GAS_URL.indexOf('__YOUR_DEPLOYMENT_ID__') >= 0) {
+      document.getElementById('viewer-loading').innerHTML =
+        '<div style="text-align:center;padding:24px;line-height:1.7">' +
+        '<div style="font-size:1.2rem;color:#e74c3c;margin-bottom:8px">⚠️ 初期設定が未完了です</div>' +
+        '<div style="font-size:.9rem;color:#bbb">' +
+        'schedule-viewer.html を開いて<br>' +
+        '<code style="color:#e8820c">window.SCHEDULE_VIEWER_GAS_URL</code> に<br>' +
+        'GASのデプロイURLを設定してください' +
+        '</div></div>';
+    } else {
+      /* 初期化トリガー */
+      window.addEventListener('load', function () {
+        var handler = __handlers['app.record.index.show'];
+        if (!handler) {
+          showViewerError('スクリプトの読み込みに失敗しました (schedule-customize4-3.js が見つからない可能性)');
+          document.getElementById('viewer-loading').innerHTML =
+            '<span style="color:#e74c3c">読み込み失敗</span>';
+          return;
+        }
+        try {
+          handler({});
+          // 初回データfetch完了を待つため少し遅延させてローディングを消す
+          setTimeout(function () {
+            var ld = document.getElementById('viewer-loading');
+            if (ld) ld.style.display = 'none';
+            updateLastUpdateLabel();
+          }, 1200);
+        } catch (e) {
+          console.error(e);
+          showViewerError('初期化エラー: ' + e.message);
+        }
+      });
+
+      /* 定期自動リロード */
+      setTimeout(function () { location.reload(); }, AUTO_RELOAD_MS);
+
+      /* タブ非表示後に長時間経過していたらリロード */
+      var lastActiveTime = Date.now();
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') {
+          if (Date.now() - lastActiveTime > 10 * 60 * 1000) {
+            location.reload();
+          }
+        }
+        lastActiveTime = Date.now();
+      });
+    }
+  </script>
+</body>
+</html>
