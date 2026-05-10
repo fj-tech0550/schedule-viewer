@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#e8820c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="スケジュール">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
 <title>フジテック スケジュール（閲覧）</title>
 <style>
   html, body {
@@ -33,7 +35,7 @@
     font-size: .85rem; box-shadow: 0 4px 12px rgba(0,0,0,.4);
   }
   #viewer-last-update {
-    position: fixed; bottom: 6px; right: 10px;
+    position: fixed; bottom: 6px; left: 10px;
     font-size: .65rem; color: #aaa;
     background: rgba(0,0,0,.55); padding: 3px 7px; border-radius: 4px;
     z-index: 100; pointer-events: none;
@@ -57,7 +59,7 @@
      * ⚠ 設定: GAS WebApp の URL を貼り付けてください (末尾は /exec)
      * =================================================================== */
     window.SCHEDULE_VIEWER_MODE = true;
-    window.SCHEDULE_VIEWER_GAS_URL = 'https://script.google.com/macros/s/AKfycbzb273KBQ8CuEL51s2j7DZ2LTU6OjRv0LfJbvrhX96VoydeNVZZcw7xckUHYlwzmQNx/exec';
+    window.SCHEDULE_VIEWER_GAS_URL = 'https://script.google.com/macros/s/__YOUR_DEPLOYMENT_ID__/exec';
 
     /* 自動リロード間隔 (ミリ秒) */
     var AUTO_RELOAD_MS = 10 * 60 * 1000; // 10分
