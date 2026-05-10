@@ -453,6 +453,66 @@
   #schedule-root.viewer-mode .sc-modal-title::after{content:' (閲覧)';opacity:.6;font-weight:400;}
   /* ドラッグ無効化 */
   #schedule-root.viewer-mode [draggable]{-webkit-user-drag:none;user-drag:none;}
+
+  /* ===== 浮遊型 個人フィルターボタン (どこからでもタップ可) ===== */
+  #schedule-root .sc-personal-fab{
+    position:fixed;bottom:24px;right:24px;z-index:500;
+    display:flex;align-items:center;gap:8px;
+    background:var(--accent);color:#fff;border:none;
+    border-radius:30px;padding:12px 20px;
+    font-size:.92rem;font-weight:700;cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,.45);
+    transition:all .2s;
+  }
+  #schedule-root .sc-personal-fab:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,0,0,.55);}
+  #schedule-root .sc-personal-fab:active{transform:scale(.95);}
+  #schedule-root .sc-personal-fab.active{background:#27ae60;}
+  #schedule-root .sc-personal-fab .fab-icon{font-size:1.15rem;line-height:1;}
+  #schedule-root .sc-personal-fab .fab-text{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  #schedule-root .sc-personal-fab-overlay{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.65);z-index:600;
+    display:none;align-items:center;justify-content:center;padding:20px;
+  }
+  #schedule-root .sc-personal-fab-overlay.open{display:flex;}
+  #schedule-root .sc-personal-fab-modal{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:18px 18px 16px;width:100%;max-width:360px;
+    display:flex;flex-direction:column;gap:14px;
+    box-shadow:0 12px 36px rgba(0,0,0,.55);
+  }
+  #schedule-root .fab-modal-header{display:flex;align-items:center;justify-content:space-between;}
+  #schedule-root .fab-modal-title{font-size:1.05rem;font-weight:700;color:var(--accent);}
+  #schedule-root .fab-modal-x{background:none;border:none;color:var(--text);font-size:1.6rem;cursor:pointer;padding:0 8px;line-height:1;}
+  #schedule-root .fab-modal-x:hover{color:var(--accent);}
+  #schedule-root .fab-modal-toggle{
+    background:none;border:2px solid var(--border);color:var(--text-dim);
+    border-radius:6px;padding:11px;font-size:.95rem;font-weight:700;
+    cursor:pointer;transition:all .2s;
+  }
+  #schedule-root .fab-modal-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  #schedule-root .fab-modal-toggle.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  #schedule-root .fab-modal-section{display:flex;flex-direction:column;gap:7px;}
+  #schedule-root .fab-modal-label{font-size:.72rem;color:var(--text-dim);letter-spacing:.06em;font-weight:700;}
+  #schedule-root .fab-modal-section select{
+    width:100%;padding:10px;border-radius:6px;
+    background:var(--bg);border:1px solid var(--border);color:var(--text);
+    font-size:.95rem;cursor:pointer;
+  }
+  #schedule-root .fab-modal-cb{
+    display:flex;align-items:center;gap:9px;padding:9px 8px;
+    font-size:.9rem;color:var(--text);cursor:pointer;border-radius:5px;
+    transition:background .15s;
+  }
+  #schedule-root .fab-modal-cb:hover{background:rgba(128,128,128,.1);}
+  #schedule-root .fab-modal-cb input{accent-color:var(--accent);width:17px;height:17px;cursor:pointer;}
+  #schedule-root .fab-modal-done{
+    background:var(--accent);color:#fff;border:none;border-radius:6px;
+    padding:12px;font-size:1rem;font-weight:700;cursor:pointer;
+    transition:filter .15s;
+  }
+  #schedule-root .fab-modal-done:hover{filter:brightness(1.1);}
   `;
 
   /* ====================================================================
@@ -639,6 +699,30 @@
   <div class="sc-loading" id="sc-loadingOverlay">
     <div class="sc-spinner"></div>
     <div class="sc-loading-text" id="sc-loadingText">kintoneと同期中...</div>
+  </div>
+
+  <!-- 浮遊型 個人フィルターボタン (どこからでもタップ可) -->
+  <button class="sc-personal-fab" id="sc-personalFab" type="button" title="個人の予定を確認">
+    <span class="fab-icon">👤</span>
+    <span class="fab-text" id="sc-fabText">個人</span>
+  </button>
+  <div class="sc-personal-fab-overlay" id="sc-fabOverlay">
+    <div class="sc-personal-fab-modal">
+      <div class="fab-modal-header">
+        <div class="fab-modal-title">👤 個人の予定を確認</div>
+        <button class="fab-modal-x" id="sc-fabClose" type="button">×</button>
+      </div>
+      <button class="fab-modal-toggle" id="sc-fabModeToggle" type="button">個人モード OFF</button>
+      <div class="fab-modal-section">
+        <div class="fab-modal-label">担当者</div>
+        <select id="sc-fabStaffSelect"></select>
+      </div>
+      <div class="fab-modal-section">
+        <label class="fab-modal-cb"><input type="checkbox" id="sc-fabShowCorp"> 🏢 会社行事を表示</label>
+        <label class="fab-modal-cb"><input type="checkbox" id="sc-fabShowDeadline"> ⚠️ 期日管理を表示</label>
+      </div>
+      <button class="fab-modal-done" id="sc-fabDone" type="button">完了</button>
+    </div>
   </div>
   `;
 
@@ -1306,6 +1390,66 @@
       body.classList.remove('active');
       if (orgPanel) orgPanel.classList.remove('disabled');
     }
+    cbCorp.checked     = personalShowCorp;
+    cbDeadline.checked = personalShowDeadline;
+
+    // 浮遊型ボタンも同期
+    renderPersonalFab();
+  }
+
+  /* ====================================================================
+   * PERSONAL FAB (浮遊型 個人フィルターボタン)
+   * ==================================================================== */
+  function renderPersonalFab() {
+    const fab        = document.getElementById('sc-personalFab');
+    const fabText    = document.getElementById('sc-fabText');
+    const toggle     = document.getElementById('sc-fabModeToggle');
+    const sel        = document.getElementById('sc-fabStaffSelect');
+    const cbCorp     = document.getElementById('sc-fabShowCorp');
+    const cbDeadline = document.getElementById('sc-fabShowDeadline');
+    if (!fab || !sel) return;
+
+    // FABの見た目を更新（ONかつ社員選択中なら社員名を表示）
+    if (personalFilterMode && personalFilterStaffId != null) {
+      const s = getStaff(personalFilterStaffId);
+      fab.classList.add('active');
+      fabText.textContent = s ? s.name : '個人モード';
+    } else {
+      fab.classList.remove('active');
+      fabText.textContent = '個人';
+    }
+
+    // セレクト構築（部署順）
+    const prevValue = String(personalFilterStaffId != null ? personalFilterStaffId : '');
+    sel.innerHTML = '';
+    const optEmpty = document.createElement('option');
+    optEmpty.value = '';
+    optEmpty.textContent = '-- 社員を選択 --';
+    sel.appendChild(optEmpty);
+    ORGS.forEach(org => {
+      const list = STAFF.filter(s => s.org === org);
+      if (list.length === 0) return;
+      const og = document.createElement('optgroup');
+      og.label = org;
+      list.forEach(s => {
+        const op = document.createElement('option');
+        op.value = String(s.id);
+        op.textContent = s.name;
+        og.appendChild(op);
+      });
+      sel.appendChild(og);
+    });
+    sel.value = prevValue;
+
+    // モード切替ボタン
+    if (personalFilterMode) {
+      toggle.classList.add('active');
+      toggle.textContent = '個人モード ON';
+    } else {
+      toggle.classList.remove('active');
+      toggle.textContent = '個人モード OFF';
+    }
+
     cbCorp.checked     = personalShowCorp;
     cbDeadline.checked = personalShowDeadline;
   }
@@ -2007,6 +2151,52 @@
       renderMain();
     });
 
+    /* 浮遊型 個人フィルターボタン (どこからでも開ける) */
+    document.getElementById('sc-personalFab').addEventListener('click', () => {
+      renderPersonalFab();
+      document.getElementById('sc-fabOverlay').classList.add('open');
+    });
+    document.getElementById('sc-fabClose').addEventListener('click', () => {
+      document.getElementById('sc-fabOverlay').classList.remove('open');
+    });
+    document.getElementById('sc-fabDone').addEventListener('click', () => {
+      document.getElementById('sc-fabOverlay').classList.remove('open');
+    });
+    document.getElementById('sc-fabOverlay').addEventListener('click', e => {
+      if (e.target === document.getElementById('sc-fabOverlay')) {
+        document.getElementById('sc-fabOverlay').classList.remove('open');
+      }
+    });
+    document.getElementById('sc-fabModeToggle').addEventListener('click', () => {
+      personalFilterMode = !personalFilterMode;
+      if (personalFilterMode && personalFilterStaffId == null) {
+        const me = getStaffByCode(loginUser.code);
+        if (me) personalFilterStaffId = me.id;
+      }
+      savePersonalFilterState();
+      renderPersonalFilter();
+      renderMain();
+    });
+    document.getElementById('sc-fabStaffSelect').addEventListener('change', e => {
+      const v = e.target.value;
+      personalFilterStaffId = v === '' ? null : parseInt(v, 10);
+      savePersonalFilterState();
+      renderPersonalFilter();
+      renderMain();
+    });
+    document.getElementById('sc-fabShowCorp').addEventListener('change', e => {
+      personalShowCorp = e.target.checked;
+      savePersonalFilterState();
+      renderPersonalFilter();
+      renderMain();
+    });
+    document.getElementById('sc-fabShowDeadline').addEventListener('change', e => {
+      personalShowDeadline = e.target.checked;
+      savePersonalFilterState();
+      renderPersonalFilter();
+      renderMain();
+    });
+
     /* オートリフレッシュ */
     document.getElementById('sc-btnRefresh').addEventListener('click', () => { refreshOn ? stopRefresh() : startRefresh(); });
     document.getElementById('sc-refreshInterval').addEventListener('change', () => { if (refreshOn) { stopRefresh(); startRefresh(); } });
@@ -2139,6 +2329,14 @@
     });
     document.getElementById('sc-btnStaffClose').addEventListener('click', () => document.getElementById('sc-staffModal').classList.remove('open'));
     document.getElementById('sc-staffModal').addEventListener('click', e => { if (e.target === document.getElementById('sc-staffModal')) document.getElementById('sc-staffModal').classList.remove('open'); });
+
+    /* 閲覧モード時は日別ビューをデフォルトに */
+    if (VIEWER_MODE) {
+      currentView = 'day';
+      document.getElementById('sc-btnViewDay').classList.add('active');
+      document.getElementById('sc-btnViewMonth').classList.remove('active');
+      document.getElementById('sc-btnViewWeek').classList.remove('active');
+    }
 
     /* 初期描画 */
     renderOrgFilter();
