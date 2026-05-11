@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=3, user-scalable=yes">
 <meta name="theme-color" content="#e8820c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="スケジュール">
@@ -40,6 +40,42 @@
     background: rgba(0,0,0,.55); padding: 3px 7px; border-radius: 4px;
     z-index: 100; pointer-events: none;
   }
+
+  /* 拡大・縮小コントロール (viewer 専用) */
+  #viewer-zoom-controls {
+    position: fixed; top: 50%; right: 12px;
+    transform: translateY(-50%);
+    z-index: 550;
+    display: flex; flex-direction: column; gap: 6px;
+    background: rgba(36,36,36,.92);
+    border: 1px solid #444; border-radius: 24px;
+    padding: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  #viewer-zoom-controls button {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: #242424;
+    border: 1px solid #444;
+    color: #e8e0d0;
+    font-size: 1.2rem; font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #viewer-zoom-controls button:hover {
+    background: #e8820c; border-color: #e8820c; color: #fff;
+  }
+  #viewer-zoom-controls button:active { transform: scale(.92); }
+  #viewer-zoom-controls .zoom-label {
+    font-size: .62rem; color: #aaa;
+    text-align: center; line-height: 1;
+    cursor: pointer;
+    padding: 4px 0;
+    user-select: none;
+  }
+  #viewer-zoom-controls .zoom-label:hover { color: #e8820c; }
 </style>
 </head>
 <body>
@@ -54,12 +90,19 @@
 
   <div id="viewer-last-update"></div>
 
+  <!-- 拡大・縮小コントロール -->
+  <div id="viewer-zoom-controls">
+    <button id="viewer-zoom-in" type="button" title="拡大">＋</button>
+    <div class="zoom-label" id="viewer-zoom-label" title="クリックで100%にリセット">100%</div>
+    <button id="viewer-zoom-out" type="button" title="縮小">−</button>
+  </div>
+
   <script>
     /* ===================================================================
      * ⚠ 設定: GAS WebApp の URL を貼り付けてください (末尾は /exec)
      * =================================================================== */
     window.SCHEDULE_VIEWER_MODE = true;
-    window.SCHEDULE_VIEWER_GAS_URL = 'https://script.google.com/macros/s/AKfycbzb273KBQ8CuEL51s2j7DZ2LTU6OjRv0LfJbvrhX96VoydeNVZZcw7xckUHYlwzmQNx/exec';
+    window.SCHEDULE_VIEWER_GAS_URL = 'https://script.google.com/macros/s/__YOUR_DEPLOYMENT_ID__/exec';
 
     /* 自動リロード間隔 (ミリ秒) */
     var AUTO_RELOAD_MS = 10 * 60 * 1000; // 10分
@@ -102,6 +145,40 @@
         hour: '2-digit', minute: '2-digit'
       });
     }
+
+    /* ===== 拡大・縮小コントロール ===== */
+    var ZOOM_KEY = 'sc-viewer-zoom';
+    var ZOOM_MIN = 0.6;
+    var ZOOM_MAX = 1.6;
+    var ZOOM_STEP = 0.1;
+    var currentZoom = 1.0;
+    try {
+      var saved = parseFloat(localStorage.getItem(ZOOM_KEY));
+      if (!isNaN(saved) && saved >= ZOOM_MIN && saved <= ZOOM_MAX) currentZoom = saved;
+    } catch (e) {}
+
+    function applyZoom(z) {
+      z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(z * 10) / 10));
+      currentZoom = z;
+      var root = document.getElementById('schedule-root');
+      if (root) root.style.zoom = String(z);
+      var lbl = document.getElementById('viewer-zoom-label');
+      if (lbl) lbl.textContent = Math.round(z * 100) + '%';
+      try { localStorage.setItem(ZOOM_KEY, String(z)); } catch (e) {}
+    }
+
+    document.getElementById('viewer-zoom-in').addEventListener('click', function () {
+      applyZoom(currentZoom + ZOOM_STEP);
+    });
+    document.getElementById('viewer-zoom-out').addEventListener('click', function () {
+      applyZoom(currentZoom - ZOOM_STEP);
+    });
+    document.getElementById('viewer-zoom-label').addEventListener('click', function () {
+      applyZoom(1.0);
+    });
+
+    /* 初期適用 */
+    applyZoom(currentZoom);
 
     /* GAS URL未設定チェック */
     if (window.SCHEDULE_VIEWER_GAS_URL.indexOf('__YOUR_DEPLOYMENT_ID__') >= 0) {
