@@ -442,6 +442,8 @@
   #schedule-root.viewer-mode #sc-modalEndTimeInput,
   #schedule-root.viewer-mode #sc-modalNotes,
   #schedule-root.viewer-mode #sc-modalType,
+  #schedule-root.viewer-mode #sc-modalDateRow,
+  #schedule-root.viewer-mode #sc-modalTimeRow,
   #schedule-root.viewer-mode .refresh-area,
   #schedule-root.viewer-mode #sc-touchHint,
   #schedule-root.viewer-mode #sc-syncStatus{display:none !important;}
@@ -535,9 +537,9 @@
         <label>🔄</label>
         <select id="sc-refreshInterval">
           <option value="30">30秒</option>
-          <option value="60" selected>1分</option>
+          <option value="60">1分</option>
           <option value="300">5分</option>
-          <option value="600">10分</option>
+          <option value="600" selected>10分</option>
         </select>
         <button class="refresh-toggle" id="sc-btnRefresh">AUTO OFF</button>
         <span class="refresh-countdown" id="sc-refreshCountdown"></span>
@@ -622,19 +624,30 @@
           <option value="会社行事">🏢 会社行事</option>
           <option value="期日管理">⚠️ 期日管理</option>
         </select>
+        <div class="viewer-only sc-modal-date-display" id="sc-viewerType"></div>
       </div>
       <div class="sc-modal-field"><label>📅 日付・期間</label><div class="sc-modal-date-display" id="sc-modalDateDisplay"></div></div>
-      <div class="sc-modal-field"><label>現場名 / 行事名</label><input type="text" id="sc-modalSiteInput" placeholder="現場名・行事名"></div>
-      <div class="sc-modal-row2">
+      <div class="sc-modal-field"><label>現場名 / 行事名</label>
+        <input type="text" id="sc-modalSiteInput" placeholder="現場名・行事名">
+        <div class="viewer-only sc-modal-date-display" id="sc-viewerSite" style="font-size:1rem;font-weight:700;"></div>
+      </div>
+      <div class="sc-modal-row2" id="sc-modalDateRow">
         <div class="sc-modal-field"><label>📅 開始日</label><input type="date" id="sc-modalStartDate"></div>
         <div class="sc-modal-field"><label>📅 終了日</label><input type="date" id="sc-modalEndDate"></div>
       </div>
-      <div class="sc-modal-row2">
+      <div class="sc-modal-row2" id="sc-modalTimeRow">
         <div class="sc-modal-field"><label>🕐 開始時間</label><input type="time" id="sc-modalTimeInput"></div>
         <div class="sc-modal-field"><label>🕐 終了時間 <span style="font-size:.62rem;color:var(--text-dim);">（空欄=+3h自動）</span></label><input type="time" id="sc-modalEndTimeInput"></div>
       </div>
-      <div class="sc-modal-field"><label>👷 参加メンバー</label><div class="sc-modal-cb-grid" id="sc-modalCbGrid"></div></div>
-      <div class="sc-modal-field"><label>📝 備考</label><textarea id="sc-modalNotes" placeholder="補足・注意事項など"></textarea></div>
+      <div class="sc-modal-field viewer-only" id="sc-viewerTimeField"><label>🕐 時間</label><div class="sc-modal-date-display" id="sc-viewerTime"></div></div>
+      <div class="sc-modal-field"><label>👷 参加メンバー</label>
+        <div class="sc-modal-cb-grid" id="sc-modalCbGrid"></div>
+        <div class="viewer-only" id="sc-viewerStaff" style="display:flex;flex-wrap:wrap;gap:4px;padding:6px 0;"></div>
+      </div>
+      <div class="sc-modal-field"><label>📝 備考</label>
+        <textarea id="sc-modalNotes" placeholder="補足・注意事項など"></textarea>
+        <div class="viewer-only sc-modal-date-display" id="sc-viewerNotes" style="white-space:pre-wrap;"></div>
+      </div>
       <div class="sc-modal-actions">
         <span class="sc-save-fb" id="sc-saveFb">✔ 保存しました</span>
         <button class="btn-sc btn-sc-sec" id="sc-btnEventClose">閉じる</button>
@@ -1954,6 +1967,37 @@
     document.getElementById('sc-modalNotes').value        = ev.notes     || '';
     document.getElementById('sc-modalType').value      = ev.type || '工事現場';
     buildCheckboxGrid('sc-modalCbGrid', ev.staff);
+    // VIEWER MODE: 閲覧専用の表示要素を更新
+    if (VIEWER_MODE) {
+      const typeMap = { '工事現場': '🔧 工事現場', '会社行事': '🏢 会社行事', '期日管理': '⚠️ 期日管理' };
+      const vType = document.getElementById('sc-viewerType');
+      if (vType) vType.textContent = typeMap[ev.type || '工事現場'] || ev.type || '';
+      const vSite = document.getElementById('sc-viewerSite');
+      if (vSite) vSite.textContent = ev.site || '';
+      const vTime = document.getElementById('sc-viewerTime');
+      if (vTime) {
+        if (ev.startTime) {
+          let t = ev.startTime;
+          if (ev.endTime) t += ' 〜 ' + ev.endTime;
+          vTime.textContent = t;
+        } else {
+          vTime.textContent = '時間指定なし';
+        }
+      }
+      const vStaff = document.getElementById('sc-viewerStaff');
+      if (vStaff) {
+        if (ev.staff && ev.staff.length > 0) {
+          vStaff.innerHTML = ev.staff.map(function(sid) {
+            const s = getStaff(sid);
+            return s ? '<span class="badge" style="background:' + s.color + ';color:#fff;">' + escHtml(s.name) + '</span>' : '';
+          }).join('');
+        } else {
+          vStaff.textContent = '（なし）';
+        }
+      }
+      const vNotes = document.getElementById('sc-viewerNotes');
+      if (vNotes) vNotes.textContent = ev.notes || '（備考なし）';
+    }
     document.getElementById('sc-saveFb').classList.remove('show');
     // ボタンのdisabled状態を必ずリセット（前回の保存成功後に残る場合があるため）
     ['sc-btnEventSave','sc-btnEventClose','sc-btnEventDelete'].forEach(function(id){
