@@ -1989,7 +1989,9 @@
         if (ev.staff && ev.staff.length > 0) {
           vStaff.innerHTML = ev.staff.map(function(sid) {
             const s = getStaff(sid);
-            return s ? '<span class="badge" style="background:' + s.color + ';color:#fff;">' + escHtml(s.name) + '</span>' : '';
+            if (!s) return '';
+            const safeName = String(s.name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return '<span class="badge" style="background:' + s.color + ';color:#fff;">' + safeName + '</span>';
           }).join('');
         } else {
           vStaff.textContent = '（なし）';
