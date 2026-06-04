@@ -1154,12 +1154,46 @@
 
   async function loadFromKintone() {
     showLoading('kintoneからデータを取得中...');
-    // 状態リセット（オートリフレッシュ時も全データ最新化）
     loadedMonths.clear();
     events = [];
     externalEvents = [];
     dailyRenderEndOffset = 1;
 
+    if (VIEWER_MODE) {
+      /* ---- VIEWERモード: GASから全データを1回で取得 ---- */
+      setSyncStatus('busy', '読込中...');
+      try {
+        const now = Date.now();
+        const cached = __viewerCache.get('all');
+        if (!cached || (now - cached.time) > VIEWER_CACHE_TTL) {
+          const res = await fetch(VIEWER_GAS_URL, { method: 'GET', cache: 'no-cache' });
+          if (!res.ok) throw new Error('GAS取得エラー: ' + res.status);
+          __viewerCache.set('all', { data: await res.json(), time: now });
+        }
+        const gasData = __viewerCache.get('all').data;
+        events = (gasData.events || []).map(r => kintoneToEvent(r));
+        externalEvents = (gasData.externals || []).map(r => mapExtRecord(r)).filter(Boolean)
+          .sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+        // 全月をロード済みとマーク → 以降のナビで追加GAS呼び出しなし
+        const td = getToday();
+        for (let d = -36; d <= 36; d++) {
+          const s = shiftMonthBy(td.getFullYear(), td.getMonth(), d);
+          loadedMonths.add(monthKey(s.y, s.m));
+        }
+        console.log('[VIEWER] スケジュール:', events.length, '件 / 申請アプリ:', externalEvents.length, '件');
+        setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
+      } catch (e) {
+        console.error('GAS load error:', e);
+        setSyncStatus('err', `取得失敗: ${e.message}`);
+        showToast(`⚠️ データ取得失敗: ${e.message}`);
+      } finally {
+        hideLoading();
+      }
+      renderMain();
+      return;
+    }
+
+    /* ---- kintone直接モード: 遅延ロード（±2ヶ月から開始） ---- */
     const today = getToday();
     const ty = today.getFullYear(), tm = today.getMonth();
     const from = shiftMonthBy(ty, tm, -2);
@@ -2550,8 +2584,7 @@
     renderPersonalFilter();
     renderStaffPool();
     renderCheckboxGrid();
-    renderMain();
-    loadFromKintone();
+    loadFromKintone(); // renderMain() は loadFromKintone 完了後に実行される
   }
 
   /* ====================================================================
