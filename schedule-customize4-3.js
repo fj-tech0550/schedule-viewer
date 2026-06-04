@@ -847,6 +847,11 @@
   let selectedColor = COLOR_PALETTE[0];
   let isFullscreen = false;
 
+  // 遅延ロード管理
+  let loadedMonths    = new Set(); // ロード済み月の Set（"YYYY-MM" 形式）
+  let isLoadingRange  = false;     // 追加ロード中フラグ（重複防止）
+  let dailyRenderEndOffset = 1;    // 日別ビューで currentMonth+N まで表示
+
   // 日付の固定化によるズレ防止：呼び出し毎に最新の Date を返す
   function getToday() { return new Date(); }
   const APP_ID = (() => { try { return kintone.app.getId(); } catch (e) { return 160; } })();
@@ -864,6 +869,32 @@
   function visibleStaff() { return STAFF.filter(s => selectedOrgs.has(s.org)); }
   function isCorp(ev) { return ev.type === '会社行事'; }
   function isDeadline(ev) { return ev.type === '期日管理'; }
+
+  // 遅延ロード用ヘルパー
+  function monthKey(y, m) { return `${y}-${pad(m + 1)}`; }
+  function isMonthLoaded(y, m) { return loadedMonths.has(monthKey(y, m)); }
+  function firstOfMonth(y, m) { return `${y}-${pad(m + 1)}-01`; }
+  function lastOfMonth(y, m) { const d = new Date(y, m + 1, 0); return toDateStr(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function shiftMonthBy(y, m, delta) { const d = new Date(y, m + delta, 1); return { y: d.getFullYear(), m: d.getMonth() }; }
+  function getNeededMonths() {
+    const months = [];
+    if (currentView === 'week') {
+      if (!currentWeekStart) return months;
+      const ws = currentWeekStart;
+      const we = new Date(ws); we.setDate(we.getDate() + 6);
+      months.push({ y: ws.getFullYear(), m: ws.getMonth() });
+      const ey = we.getFullYear(), em = we.getMonth();
+      if (!months.some(x => x.y === ey && x.m === em)) months.push({ y: ey, m: em });
+    } else if (currentView === 'day') {
+      for (let d = -1; d <= dailyRenderEndOffset; d++) {
+        months.push(shiftMonthBy(currentYear, currentMonth, d));
+      }
+    } else {
+      // month view: 前後1ヶ月も隣セルに表示されるためロードしておく
+      for (let d = -1; d <= 1; d++) months.push(shiftMonthBy(currentYear, currentMonth, d));
+    }
+    return months;
+  }
 
   function eventMatchesFilter(ev) {
     // ----- 個人フィルターモード -----
@@ -1055,74 +1086,145 @@
     return allRecords;
   }
 
-  async function loadFromKintone() {
-    showLoading('kintoneからデータを取得中...');
-    setSyncStatus('busy', '同期中...');
+  /* 指定月範囲をロード（未ロード月のみ取得してマージ） */
+  async function loadMonthRange(fromYear, fromMonth, toYear, toMonth) {
+    if (isLoadingRange) return;
+
+    // 未ロード月を抽出
+    const toLoad = [];
+    let y = fromYear, m = fromMonth;
+    while (y < toYear || (y === toYear && m <= toMonth)) {
+      if (!isMonthLoaded(y, m)) toLoad.push({ y, m });
+      m++; if (m > 11) { m = 0; y++; }
+    }
+    if (toLoad.length === 0) return;
+
+    isLoadingRange = true;
+    const fromStr = firstOfMonth(fromYear, fromMonth);
+    const toStr   = lastOfMonth(toYear, toMonth);
+    // 複数日またがりイベントをカバーするため2ヶ月前から取得
+    const ext = shiftMonthBy(fromYear, fromMonth, -2);
+    const extFromStr = firstOfMonth(ext.y, ext.m);
+
+    setSyncStatus('busy', '読込中...');
     try {
       const records = await fetchAllRecords(
         APP_ID,
-        'order by 開始日 asc',
+        `開始日 >= "${extFromStr}" and 開始日 <= "${toStr}" order by 開始日 asc`,
         ['$id','現場名','開始日','終了日','開始時間','終了時間','担当者','作成者','備考','種別']
       );
-      events = records.map(r => kintoneToEvent(r));
-      await loadApplicationEvents();
+      const existingIds = new Set(events.map(e => String(e.kintoneId)));
+      const newEvs = records.map(r => kintoneToEvent(r)).filter(e => !existingIds.has(String(e.kintoneId)));
+      events = [...events, ...newEvs];
+
+      // 申請アプリも同期取得
+      await loadApplicationEventsRange(fromStr, toStr);
+
+      toLoad.forEach(({ y, m }) => loadedMonths.add(monthKey(y, m)));
+
+      // VIEWERモードはGASが全データ返すため、一度のロードで全月済みとする
+      if (VIEWER_MODE) {
+        const now = getToday();
+        for (let delta = -36; delta <= 36; delta++) {
+          const s = shiftMonthBy(now.getFullYear(), now.getMonth(), delta);
+          loadedMonths.add(monthKey(s.y, s.m));
+        }
+      }
+
       setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
-      renderMain();
+    } catch (e) {
+      console.error('range load error:', e);
+      setSyncStatus('err', `取得失敗: ${e.message}`);
+      showToast(`⚠️ データ取得失敗: ${e.message}`);
+    } finally {
+      isLoadingRange = false;
+    }
+  }
+
+  /* ナビゲーション時：必要月のロードを確保してから描画 */
+  async function navigateAndRender() {
+    const needed  = getNeededMonths();
+    const missing = needed.filter(({ y, m }) => !isMonthLoaded(y, m));
+    if (missing.length > 0) {
+      missing.sort((a, b) => a.y !== b.y ? a.y - b.y : a.m - b.m);
+      const first = missing[0], last = missing[missing.length - 1];
+      await loadMonthRange(first.y, first.m, last.y, last.m);
+    }
+    renderMain();
+  }
+
+  async function loadFromKintone() {
+    showLoading('kintoneからデータを取得中...');
+    // 状態リセット（オートリフレッシュ時も全データ最新化）
+    loadedMonths.clear();
+    events = [];
+    externalEvents = [];
+    dailyRenderEndOffset = 1;
+
+    const today = getToday();
+    const ty = today.getFullYear(), tm = today.getMonth();
+    const from = shiftMonthBy(ty, tm, -2);
+    const to   = shiftMonthBy(ty, tm, 2);
+    try {
+      await loadMonthRange(from.y, from.m, to.y, to.m);
     } catch (e) {
       console.error('kintone load error:', e);
       setSyncStatus('err', `取得失敗: ${e.message}`);
       showToast(`⚠️ kintone取得失敗: ${e.message}`);
-    } finally { hideLoading(); }
+    } finally {
+      hideLoading();
+    }
+    renderMain();
   }
 
 
   /* ====================================================================
-   * 申請アプリ参照イベント取得
+   * 申請アプリ参照イベント取得（共通マッパー）
    * ==================================================================== */
-  async function loadApplicationEvents() {
+  function mapExtRecord(rec) {
+    const dateVal = (rec['日付選択用'] && rec['日付選択用'].value) ? rec['日付選択用'].value : null;
+    if (!dateVal) return null;
+    const format      = rec['休みの形式'] ? rec['休みの形式'].value : '一日';
+    const memo        = rec['時間表示用'] ? (rec['時間表示用'].value || '') : '';
+    const category    = rec['非当番'] ? rec['非当番'].value : '';
+    const creatorCode = (rec['作成者'] && rec['作成者'].value) ? rec['作成者'].value.code : '';
+    const cs = getStaffByCode(creatorCode);
+    let startTime = '08:00', endTime = '17:00';
+    if (format === 'AM')      { startTime = '08:00'; endTime = '12:00'; }
+    else if (format === 'PM') { startTime = '13:00'; endTime = '17:00'; }
+    const staffId = cs ? cs.id : null;
+    return {
+      id        : eventIdCounter++,
+      kintoneId : rec['$id'].value,
+      startDate : dateVal,
+      endDate   : dateVal,
+      site      : category + (cs ? ` (${cs.name})` : ''),
+      startTime, endTime,
+      staff     : staffId !== null ? [staffId] : [],
+      notes     : memo,
+      type      : '会社行事',
+      isExternal: true,
+      creatorCode,
+      creatorOrg: cs ? cs.org : ''
+    };
+  }
+
+  /* 範囲指定付き申請アプリ取得（loadMonthRange から呼ぶ） */
+  async function loadApplicationEventsRange(fromDate, toDate) {
     try {
       const targetValues = '"有給","振替休日","夏季休暇","特別休暇","土曜出勤"';
-      const allExtRecords = await fetchAllRecords(
-        EXTERNAL_APP_ID,
-        `非当番 in (${targetValues})`,
+      let query = `非当番 in (${targetValues})`;
+      if (fromDate && toDate) query += ` and 日付選択用 >= "${fromDate}" and 日付選択用 <= "${toDate}"`;
+      const recs = await fetchAllRecords(
+        EXTERNAL_APP_ID, query,
         ['$id','非当番','日付選択用','休みの形式','時間表示用','作成者']
       );
-      console.log('[申請アプリ] 取得レコード数:', allExtRecords.length);
-      externalEvents = allExtRecords
-        .map(rec => {
-          const dateVal = (rec['日付選択用'] && rec['日付選択用'].value) ? rec['日付選択用'].value : null;
-          if (!dateVal) return null;
-          const format      = rec['休みの形式'] ? rec['休みの形式'].value : '一日';
-          const memo        = rec['時間表示用'] ? (rec['時間表示用'].value || '') : '';
-          const category    = rec['非当番'] ? rec['非当番'].value : '';
-          const creatorCode = (rec['作成者'] && rec['作成者'].value) ? rec['作成者'].value.code : '';
-          const cs = getStaffByCode(creatorCode);
-          let startTime = '08:00', endTime = '17:00';
-          if (format === 'AM')      { startTime = '08:00'; endTime = '12:00'; }
-          else if (format === 'PM') { startTime = '13:00'; endTime = '17:00'; }
-          const staffId = cs ? cs.id : null;
-          return {
-            id        : eventIdCounter++,
-            kintoneId : rec['$id'].value,
-            startDate : dateVal,
-            endDate   : dateVal,
-            site      : category + (cs ? ` (${cs.name})` : ''),
-            startTime,
-            endTime,
-            staff     : staffId !== null ? [staffId] : [],
-            notes     : memo,
-            type      : '会社行事',
-            isExternal: true,
-            creatorCode,
-            creatorOrg: cs ? cs.org : ''
-          };
-        })
-        .filter(Boolean)
-        .sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
-      console.log('[申請アプリ] 表示対象イベント数:', externalEvents.length);
+      const existingIds = new Set(externalEvents.map(e => String(e.kintoneId)));
+      const newEvs = recs.map(r => mapExtRecord(r)).filter(Boolean).filter(e => !existingIds.has(String(e.kintoneId)));
+      externalEvents = [...externalEvents, ...newEvs].sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+      console.log('[申請アプリ] 追加ロード件数:', newEvs.length, '累計:', externalEvents.length);
     } catch (e) {
       console.error('[申請アプリ] 取得失敗:', e);
-      externalEvents = [];
     }
   }
 
@@ -1829,10 +1931,11 @@
   function renderDaily() {
     const main = document.getElementById('sc-mainArea');
     if (!main) return;
+    const prevScrollTop = main.scrollTop; // スクロール位置を保持（追加ロード時）
     main.innerHTML = '';
     const wrap = document.createElement('div'); wrap.className = 'daily-view';
 
-    for (let offset = -1; offset <= 1; offset++) {
+    for (let offset = -1; offset <= dailyRenderEndOffset; offset++) {
       let y = currentYear, m = currentMonth + offset;
       if (m < 0)  { m += 12; y--; }
       if (m > 11) { m -= 12; y++; }
@@ -1905,11 +2008,37 @@
         wrap.appendChild(row);
       }
     }
+    // ---- 末尾センチネル：スクロール末尾で翌月を追加ロード ----
+    const sentinel = document.createElement('div');
+    sentinel.style.cssText = 'height:2px;width:100%;';
+    wrap.appendChild(sentinel);
+
     main.appendChild(wrap);
-    setTimeout(() => {
-      const target = wrap.querySelector('.today-row') || wrap.querySelector(`[data-date="${toDateStr(currentYear, currentMonth, 1)}"]`);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
+
+    // 初回表示時のみ今日行にスクロール（追加ロード時はスクロール位置を維持）
+    if (prevScrollTop === 0) {
+      setTimeout(() => {
+        const target = wrap.querySelector('.today-row') || wrap.querySelector(`[data-date="${toDateStr(currentYear, currentMonth, 1)}"]`);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    } else {
+      main.scrollTop = prevScrollTop;
+    }
+
+    // IntersectionObserver でセンチネルが見えたら翌月追加ロード
+    if (typeof IntersectionObserver !== 'undefined') {
+      const obs = new IntersectionObserver(async (entries) => {
+        if (!entries[0].isIntersecting || isLoadingRange) return;
+        obs.disconnect();
+        dailyRenderEndOffset++;
+        const next = shiftMonthBy(currentYear, currentMonth, dailyRenderEndOffset);
+        if (!isMonthLoaded(next.y, next.m)) {
+          await loadMonthRange(next.y, next.m, next.y, next.m);
+        }
+        renderDaily(); // スクロール位置保持しつつ再描画
+      }, { root: main, threshold: 0 });
+      obs.observe(sentinel);
+    }
   }
 
   /* ====================================================================
@@ -2130,51 +2259,60 @@
       document.getElementById('sc-sidebar').classList.add('sidebar-open');
     }
 
-    /* 月切り替え */
-    document.getElementById('sc-btnPrev').addEventListener('click', () => {
+    /* 月切り替え（未ロード月は自動追加ロード） */
+    document.getElementById('sc-btnPrev').addEventListener('click', async () => {
       if (currentView === 'week') {
         currentWeekStart = currentWeekStart || getWeekStart(getToday());
         currentWeekStart.setDate(currentWeekStart.getDate() - 7);
-      } else { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } }
-      renderMain();
+      } else {
+        currentMonth--;
+        if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+        dailyRenderEndOffset = 1; // 日別ビューの拡張リセット
+      }
+      await navigateAndRender();
     });
-    document.getElementById('sc-btnNext').addEventListener('click', () => {
+    document.getElementById('sc-btnNext').addEventListener('click', async () => {
       if (currentView === 'week') {
         currentWeekStart = currentWeekStart || getWeekStart(getToday());
         currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-      } else { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } }
-      renderMain();
+      } else {
+        currentMonth++;
+        if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+        dailyRenderEndOffset = 1; // 日別ビューの拡張リセット
+      }
+      await navigateAndRender();
     });
-    document.getElementById('sc-btnToday').addEventListener('click', () => {
+    document.getElementById('sc-btnToday').addEventListener('click', async () => {
       const _t = getToday();
       if (currentView === 'week') { currentWeekStart = getWeekStart(_t); }
-      else { currentYear = _t.getFullYear(); currentMonth = _t.getMonth(); }
-      renderMain();
+      else { currentYear = _t.getFullYear(); currentMonth = _t.getMonth(); dailyRenderEndOffset = 1; }
+      await navigateAndRender();
     });
 
     /* ビュー切り替え */
-    document.getElementById('sc-btnViewMonth').addEventListener('click', () => {
+    document.getElementById('sc-btnViewMonth').addEventListener('click', async () => {
       currentView = 'month';
       document.getElementById('sc-btnViewMonth').classList.add('active');
       document.getElementById('sc-btnViewDay').classList.remove('active');
       document.getElementById('sc-btnViewWeek').classList.remove('active');
-      renderMain();
+      await navigateAndRender();
     });
-    document.getElementById('sc-btnViewDay').addEventListener('click', () => {
+    document.getElementById('sc-btnViewDay').addEventListener('click', async () => {
       currentView = 'day';
+      dailyRenderEndOffset = 1;
       document.getElementById('sc-btnViewDay').classList.add('active');
       document.getElementById('sc-btnViewMonth').classList.remove('active');
       document.getElementById('sc-btnViewWeek').classList.remove('active');
-      renderMain();
+      await navigateAndRender();
     });
 
-    document.getElementById('sc-btnViewWeek').addEventListener('click', () => {
+    document.getElementById('sc-btnViewWeek').addEventListener('click', async () => {
       currentView = 'week';
       currentWeekStart = getWeekStart(getToday());
       document.getElementById('sc-btnViewWeek').classList.add('active');
       document.getElementById('sc-btnViewMonth').classList.remove('active');
       document.getElementById('sc-btnViewDay').classList.remove('active');
-      renderMain();
+      await navigateAndRender();
     });
 
     /* 部署フィルター */
