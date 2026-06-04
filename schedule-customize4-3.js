@@ -23,9 +23,8 @@
    * ==================================================================== */
   const VIEWER_MODE = (typeof window !== 'undefined' && window.SCHEDULE_VIEWER_MODE === true);
   const VIEWER_GAS_URL = (typeof window !== 'undefined' && window.SCHEDULE_VIEWER_GAS_URL) || '';
-  let __viewerCacheData = null;
-  let __viewerCacheTime = 0;
-  const VIEWER_CACHE_TTL = 5000; // 5秒（連続呼び出しでの重複fetch防止）
+  const __viewerCache = new Map(); // rangeKey -> { data, time }
+  const VIEWER_CACHE_TTL = 300000; // 5分（GAS側キャッシュと合わせる）
 
   /* ====================================================================
    * THEME DEFINITIONS
@@ -1016,15 +1015,25 @@
       // 書き込み系は閲覧モードでは無視
       if (method !== 'GET' || endpoint !== 'records') return { records: [], id: 0 };
       const now = Date.now();
-      if (!__viewerCacheData || (now - __viewerCacheTime) > VIEWER_CACHE_TTL) {
-        const res = await fetch(VIEWER_GAS_URL, { method: 'GET', cache: 'no-cache' });
+      // クエリから日付範囲を抽出（開始日 / 日付選択用 どちらにも対応）
+      const q = params.query || '';
+      const fromM = q.match(/(?:開始日|日付選択用)\s*>=\s*"([^"]+)"/);
+      const toM   = q.match(/(?:開始日|日付選択用)\s*<=\s*"([^"]+)"/);
+      const dateFrom = fromM ? fromM[1] : null;
+      const dateTo   = toM   ? toM[1]   : null;
+      const cacheKey = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : 'all';
+      const cached = __viewerCache.get(cacheKey);
+      if (!cached || (now - cached.time) > VIEWER_CACHE_TTL) {
+        let url = VIEWER_GAS_URL;
+        if (dateFrom && dateTo) url += `?from=${encodeURIComponent(dateFrom)}&to=${encodeURIComponent(dateTo)}`;
+        const res = await fetch(url, { method: 'GET', cache: 'no-cache' });
         if (!res.ok) throw new Error('GAS取得エラー: ' + res.status);
-        __viewerCacheData = await res.json();
-        __viewerCacheTime = now;
+        __viewerCache.set(cacheKey, { data: await res.json(), time: now });
       }
+      const data = __viewerCache.get(cacheKey).data;
       const appKey = String(params.app);
-      if (appKey === String(APP_ID))          return { records: __viewerCacheData.events    || [] };
-      if (appKey === String(EXTERNAL_APP_ID)) return { records: __viewerCacheData.externals || [] };
+      if (appKey === String(APP_ID))          return { records: data.events    || [] };
+      if (appKey === String(EXTERNAL_APP_ID)) return { records: data.externals || [] };
       return { records: [] };
     }
     return kintone.api(`/k/v1/${endpoint}`, method, params);
@@ -1121,16 +1130,6 @@
       await loadApplicationEventsRange(fromStr, toStr);
 
       toLoad.forEach(({ y, m }) => loadedMonths.add(monthKey(y, m)));
-
-      // VIEWERモードはGASが全データ返すため、一度のロードで全月済みとする
-      if (VIEWER_MODE) {
-        const now = getToday();
-        for (let delta = -36; delta <= 36; delta++) {
-          const s = shiftMonthBy(now.getFullYear(), now.getMonth(), delta);
-          loadedMonths.add(monthKey(s.y, s.m));
-        }
-      }
-
       setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
     } catch (e) {
       console.error('range load error:', e);
@@ -1926,119 +1925,124 @@
   }
 
   /* ====================================================================
-   * DAILY LIST VIEW (前月・当月・翌月 連続スクロール)
+   * DAILY LIST VIEW
    * ==================================================================== */
-  function renderDaily() {
-    const main = document.getElementById('sc-mainArea');
-    if (!main) return;
-    const prevScrollTop = main.scrollTop; // スクロール位置を保持（追加ロード時）
-    main.innerHTML = '';
-    const wrap = document.createElement('div'); wrap.className = 'daily-view';
 
-    for (let offset = -1; offset <= dailyRenderEndOffset; offset++) {
-      let y = currentYear, m = currentMonth + offset;
-      if (m < 0)  { m += 12; y--; }
-      if (m > 11) { m -= 12; y++; }
+  /* 1ヶ月分の日付行を wrap に追加するヘルパー（renderDaily / 追記両用） */
+  function appendMonthToDailyWrap(wrap, y, m) {
+    const sep = document.createElement('div');
+    sep.className = `month-separator${(y===currentYear && m===currentMonth) ? ' current-month' : ''}`;
+    sep.textContent = `${y}年 ${m + 1}月`;
+    wrap.appendChild(sep);
 
-      const sep = document.createElement('div');
-      sep.className = `month-separator${(y===currentYear && m===currentMonth) ? ' current-month' : ''}`;
-      sep.textContent = `${y}年 ${m + 1}月`;
-      wrap.appendChild(sep);
+    const dim = new Date(y, m + 1, 0).getDate();
+    for (let d = 1; d <= dim; d++) {
+      const dateStr = toDateStr(y, m, d);
+      const dow = new Date(dateStr + 'T00:00:00').getDay();
+      const isTodayRow = dateStr === todayStr();
+      const row = document.createElement('div');
+      row.className = `day-row${dow===0?' sun-row':dow===6?' sat-row':''}${isTodayRow?' today-row':''}`;
+      row.dataset.date = dateStr;
 
-      const dim = new Date(y, m + 1, 0).getDate();
-      for (let d = 1; d <= dim; d++) {
-        const dateStr = toDateStr(y, m, d);
-        const dow = new Date(dateStr + 'T00:00:00').getDay();
-        const isTodayRow = dateStr === todayStr();
-        const row = document.createElement('div');
-        row.className = `day-row${dow===0?' sun-row':dow===6?' sat-row':''}${isTodayRow?' today-row':''}`;
-        row.dataset.date = dateStr;
+      const lbl = document.createElement('div'); lbl.className = 'day-label';
+      lbl.innerHTML = `<div class="dl-num">${d}</div><div class="dl-dow">${DAYS[dow]}</div>`;
+      row.appendChild(lbl);
 
-        const lbl = document.createElement('div'); lbl.className = 'day-label';
-        lbl.innerHTML = `<div class="dl-num">${d}</div><div class="dl-dow">${DAYS[dow]}</div>`;
-        row.appendChild(lbl);
+      const evArea = document.createElement('div'); evArea.className = 'day-events'; evArea.style.flexDirection = 'column';
+      const dayEvs = eventsOnDate(dateStr).sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
-        const evArea = document.createElement('div'); evArea.className = 'day-events'; evArea.style.flexDirection = 'column';
-        const dayEvs = eventsOnDate(dateStr).sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
-
-        if (dayEvs.length === 0) {
-          const emp = document.createElement('div'); emp.className = 'day-empty'; emp.textContent = '予定なし'; evArea.appendChild(emp);
-        } else {
-          const cardRow = document.createElement('div'); cardRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;width:100%;';
-          dayEvs.forEach(ev => {
-            const first = isFirstDay(ev, dateStr);
-            const corp  = isCorp(ev);
-            const deadline = isDeadline(ev);
-            const card  = document.createElement('div');
-            card.className = `day-event-card${corp?' corp':''}${deadline?' deadline':''}${ev.isExternal?' ext':''}${first?'':' cont'}`;
-            let html = `<div class="dec-name">${first?makeEvIcon(ev):'⟶'} ${ev.site}`;
-            if (first && ev.endDate && ev.endDate !== ev.startDate) html += ` 〜${ev.endDate.slice(5)}`;
-            html += '</div>';
-            if (first && ev.startTime) html += `<div class="dec-time">🕐 ${ev.startTime}</div>`;
-            card.innerHTML = html;
-            const bd = document.createElement('div'); bd.className = 'dec-badges';
-            ev.staff.forEach(sid => { const s = getStaff(sid); if (s) bd.appendChild(makeBadge(s)); });
-            card.appendChild(bd);
-            if (!isTouch) {
-              card.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); card.classList.add('drop-target'); });
-              card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
-              card.addEventListener('drop',      e => { e.preventDefault(); e.stopPropagation(); card.classList.remove('drop-target'); onChipDrop(ev.id); });
-            }
-            if (!isTouch) {
-              card.addEventListener('mouseenter', function(e){ window._scShowTip && window._scShowTip(ev, e); });
-              card.addEventListener('mouseleave', function(){ window._scHideTip && window._scHideTip(); });
-            }
-            card.addEventListener('click', e => {
-              e.stopPropagation();
-              if (isTouch && touchSelectedStaffId) { onChipTouchClick(ev.id); return; }
-              openEventModal(ev.id);
-            });
-            cardRow.appendChild(card);
+      if (dayEvs.length === 0) {
+        const emp = document.createElement('div'); emp.className = 'day-empty'; emp.textContent = '予定なし'; evArea.appendChild(emp);
+      } else {
+        const cardRow = document.createElement('div'); cardRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;width:100%;';
+        dayEvs.forEach(ev => {
+          const first = isFirstDay(ev, dateStr);
+          const corp  = isCorp(ev);
+          const deadline = isDeadline(ev);
+          const card  = document.createElement('div');
+          card.className = `day-event-card${corp?' corp':''}${deadline?' deadline':''}${ev.isExternal?' ext':''}${first?'':' cont'}`;
+          let html = `<div class="dec-name">${first?makeEvIcon(ev):'⟶'} ${ev.site}`;
+          if (first && ev.endDate && ev.endDate !== ev.startDate) html += ` 〜${ev.endDate.slice(5)}`;
+          html += '</div>';
+          if (first && ev.startTime) html += `<div class="dec-time">🕐 ${ev.startTime}</div>`;
+          card.innerHTML = html;
+          const bd = document.createElement('div'); bd.className = 'dec-badges';
+          ev.staff.forEach(sid => { const s = getStaff(sid); if (s) bd.appendChild(makeBadge(s)); });
+          card.appendChild(bd);
+          if (!isTouch) {
+            card.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); card.classList.add('drop-target'); });
+            card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
+            card.addEventListener('drop',      e => { e.preventDefault(); e.stopPropagation(); card.classList.remove('drop-target'); onChipDrop(ev.id); });
+          }
+          if (!isTouch) {
+            card.addEventListener('mouseenter', function(e){ window._scShowTip && window._scShowTip(ev, e); });
+            card.addEventListener('mouseleave', function(){ window._scHideTip && window._scHideTip(); });
+          }
+          card.addEventListener('click', e => {
+            e.stopPropagation();
+            if (isTouch && touchSelectedStaffId) { onChipTouchClick(ev.id); return; }
+            openEventModal(ev.id);
           });
-          evArea.appendChild(cardRow);
-        }
-        row.appendChild(evArea);
-        if (!isTouch) {
-          row.addEventListener('dragover',  onCellDragOver);
-          row.addEventListener('dragleave', onCellDragLeave);
-          row.addEventListener('drop',      onCellDrop);
-        } else {
-          row.addEventListener('click', () => { if (touchSelectedStaffId) onCellTouchClick(dateStr); });
-        }
-        wrap.appendChild(row);
+          cardRow.appendChild(card);
+        });
+        evArea.appendChild(cardRow);
       }
+      row.appendChild(evArea);
+      if (!isTouch) {
+        row.addEventListener('dragover',  onCellDragOver);
+        row.addEventListener('dragleave', onCellDragLeave);
+        row.addEventListener('drop',      onCellDrop);
+      } else {
+        row.addEventListener('click', () => { if (touchSelectedStaffId) onCellTouchClick(dateStr); });
+      }
+      wrap.appendChild(row);
     }
-    // ---- 末尾センチネル：スクロール末尾で翌月を追加ロード ----
+  }
+
+  /* センチネルを wrap 末尾に設置し、IntersectionObserver で翌月を追記する */
+  function attachDailySentinel(main, wrap) {
+    if (typeof IntersectionObserver === 'undefined') return;
     const sentinel = document.createElement('div');
     sentinel.style.cssText = 'height:2px;width:100%;';
     wrap.appendChild(sentinel);
 
+    const obs = new IntersectionObserver(async (entries) => {
+      if (!entries[0].isIntersecting || isLoadingRange) return;
+      obs.disconnect();
+      sentinel.remove();
+
+      dailyRenderEndOffset++;
+      const next = shiftMonthBy(currentYear, currentMonth, dailyRenderEndOffset);
+      if (!isMonthLoaded(next.y, next.m)) {
+        await loadMonthRange(next.y, next.m, next.y, next.m);
+      }
+      // DOM に追記するだけ（スクロール位置は変わらない）
+      appendMonthToDailyWrap(wrap, next.y, next.m);
+      attachDailySentinel(main, wrap); // 次の末尾にセンチネルを再設置
+    }, { root: main, threshold: 0 });
+
+    obs.observe(sentinel);
+  }
+
+  function renderDaily() {
+    const main = document.getElementById('sc-mainArea');
+    if (!main) return;
+    main.innerHTML = '';
+    const wrap = document.createElement('div'); wrap.className = 'daily-view';
+
+    for (let offset = -1; offset <= dailyRenderEndOffset; offset++) {
+      const shifted = shiftMonthBy(currentYear, currentMonth, offset);
+      appendMonthToDailyWrap(wrap, shifted.y, shifted.m);
+    }
+
+    attachDailySentinel(main, wrap);
     main.appendChild(wrap);
 
-    // 初回表示時のみ今日行にスクロール（追加ロード時はスクロール位置を維持）
-    if (prevScrollTop === 0) {
-      setTimeout(() => {
-        const target = wrap.querySelector('.today-row') || wrap.querySelector(`[data-date="${toDateStr(currentYear, currentMonth, 1)}"]`);
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 50);
-    } else {
-      main.scrollTop = prevScrollTop;
-    }
-
-    // IntersectionObserver でセンチネルが見えたら翌月追加ロード
-    if (typeof IntersectionObserver !== 'undefined') {
-      const obs = new IntersectionObserver(async (entries) => {
-        if (!entries[0].isIntersecting || isLoadingRange) return;
-        obs.disconnect();
-        dailyRenderEndOffset++;
-        const next = shiftMonthBy(currentYear, currentMonth, dailyRenderEndOffset);
-        if (!isMonthLoaded(next.y, next.m)) {
-          await loadMonthRange(next.y, next.m, next.y, next.m);
-        }
-        renderDaily(); // スクロール位置保持しつつ再描画
-      }, { root: main, threshold: 0 });
-      obs.observe(sentinel);
-    }
+    // 今日の行にスクロール
+    setTimeout(() => {
+      const target = wrap.querySelector('.today-row') || wrap.querySelector(`[data-date="${toDateStr(currentYear, currentMonth, 1)}"]`);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   }
 
   /* ====================================================================
