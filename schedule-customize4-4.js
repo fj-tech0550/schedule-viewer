@@ -134,6 +134,8 @@
   /* SIDEBAR */
   #schedule-root .sidebar{background:var(--surface);border-right:2px solid var(--border);overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
   #schedule-root .sidebar-toggle-bar{display:none;}
+  #schedule-root .sc-sidebar-tab{display:none;}
+  #schedule-root .sc-sidebar-overlay{display:none;}
   #schedule-root .sidebar-inner{display:flex;flex-direction:column;gap:10px;flex:1;}
   #schedule-root .panel-title{font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--accent);border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:8px;}
 
@@ -188,7 +190,14 @@
   #schedule-root .form-group textarea:focus{border-color:var(--accent);}
   #schedule-root .form-group textarea{resize:vertical;min-height:52px;}
   #schedule-root .form-row2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px;}
-  #schedule-root .form-row2 .form-group{margin-bottom:0;}
+  #schedule-root .form-row2 .form-group{margin-bottom:0;min-width:0;}
+  /* 終了日が枠外にはみ出す不具合の修正：grid item は内容(date inputの最小幅)に合わせて
+     自動的に広がってしまうため、min-width:0 で明示的にグリッド枠内へ収める */
+  #schedule-root .form-group input[type="date"],
+  #schedule-root .form-group input[type="time"]{min-width:0;}
+  /* 開始時間/終了時間の行で、終了時間ラベルの注釈テキストが折り返して2行になり
+     入力欄が開始時間より下にズレてしまう不具合の修正：両ラベルの高さを揃える */
+  #schedule-root .sc-time-row label{min-height:2.3em;}
   #schedule-root .checkbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:180px;overflow-y:auto;}
   #schedule-root .checkbox-item{display:flex;align-items:center;gap:5px;cursor:pointer;padding:3px 5px;border-radius:4px;transition:background .15s;font-size:.72rem;}
   #schedule-root .checkbox-item:hover{background:rgba(128,128,128,.08);}
@@ -205,7 +214,14 @@
   #schedule-root .btn-register:disabled{background:#888;cursor:not-allowed;}
 
   /* MAIN */
-  #schedule-root .main{overflow-y:auto;padding:12px;background:var(--bg);}
+  /* 曜日行(cal-dow)はposition:stickyでmainの上端に固定されるが、mainにpadding-topを
+     付けると「paddingの隙間」がstickyの固定対象外として残り、スクロール中にその隙間へ
+     予定がちらっと透けて見えてしまう。padding-topは外し、代わりに各ビューのラッパー側に
+     margin-topを付けることで見た目の余白は変えずにこの隙間を無くす。 */
+  #schedule-root .main{overflow-y:auto;padding:0 12px 12px;background:var(--bg);}
+  #schedule-root .main>.cal-grid,
+  #schedule-root .main>.daily-view,
+  #schedule-root .main>.tt-wrap{margin-top:12px;}
 
   /* MONTHLY CALENDAR */
   #schedule-root .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
@@ -214,10 +230,10 @@
   #schedule-root .cal-dow.sat{color:#5dade2;}
   #schedule-root .cal-cell{background:var(--surface);border:1px solid var(--border);min-height:100px;padding:4px;transition:background .15s,border-color .15s;overflow:hidden;}
   #schedule-root .cal-cell.other-month{opacity:.45;}
-  #schedule-root .cal-cell.today{border-color:var(--accent);background:rgba(232,130,12,.06);}
+  #schedule-root .cal-cell.today{border-color:var(--accent);border-width:3px;background:rgba(232,130,12,.16);}
   #schedule-root .cal-cell.drag-over,#schedule-root .cal-cell.touch-over{background:rgba(232,130,12,.08);border-color:var(--accent);border-style:dashed;}
   #schedule-root .date-num{font-size:.75rem;font-weight:700;color:var(--text-dim);margin-bottom:3px;}
-  #schedule-root .cal-cell.today .date-num{color:var(--accent);}
+  #schedule-root .cal-cell.today .date-num{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff!important;font-size:.9rem;font-weight:900;line-height:1;}
   #schedule-root .sun-cell .date-num{color:#e74c3c;}
   #schedule-root .sat-cell .date-num{color:#5dade2;}
   #schedule-root .cell-events{display:flex;flex-direction:column;gap:2px;}
@@ -246,14 +262,14 @@
   #schedule-root .month-separator{background:linear-gradient(135deg,var(--surface),var(--surface2));border:2px solid var(--accent);border-radius:4px;padding:8px 16px;text-align:center;font-size:1rem;font-weight:700;color:var(--accent);letter-spacing:.1em;margin:8px 0 4px;}
   #schedule-root .month-separator.current-month{border-width:3px;font-size:1.15rem;}
   #schedule-root .day-row{display:grid;grid-template-columns:80px 1fr;background:var(--surface);border:1px solid var(--border);border-radius:4px;min-height:48px;overflow:hidden;transition:border-color .15s;}
-  #schedule-root .day-row.today-row{border-color:var(--accent);}
+  #schedule-root .day-row.today-row{border-color:var(--accent);border-width:2px;background:rgba(232,130,12,.09)!important;}
   #schedule-root .day-row.drag-over,#schedule-root .day-row.touch-over{background:rgba(232,130,12,.06);border-color:var(--accent);border-style:dashed;}
   #schedule-root .day-label{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 6px;border-right:1px solid var(--border);background:var(--surface2);min-width:80px;}
   #schedule-root .day-label .dl-num{font-size:1.4rem;font-weight:700;line-height:1;}
   #schedule-root .day-label .dl-dow{font-size:.65rem;font-weight:700;margin-top:2px;}
   #schedule-root .day-row.sun-row .dl-num,#schedule-root .day-row.sun-row .dl-dow{color:#e74c3c;}
   #schedule-root .day-row.sat-row .dl-num,#schedule-root .day-row.sat-row .dl-dow{color:#5dade2;}
-  #schedule-root .day-row.today-row .dl-num{color:var(--accent);}
+  #schedule-root .day-row.today-row .dl-num{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff!important;font-size:1.35rem;font-weight:900;line-height:1;}
   #schedule-root .day-events{display:flex;flex-wrap:wrap;align-items:flex-start;gap:5px;padding:8px 10px;}
   #schedule-root .day-event-card{background:var(--ev-bg);border:1px solid var(--ev-border);border-left:3px solid var(--ev-color);border-radius:4px;padding:4px 8px;cursor:pointer;transition:filter .15s;min-width:140px;max-width:280px;}
   #schedule-root .day-event-card:hover{filter:brightness(1.12);}
@@ -287,6 +303,8 @@
   .sc-modal-field textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:7px 10px;font-size:.88rem;outline:none;transition:border-color .2s;font-family:inherit;}
   .sc-modal-field input:focus,.sc-modal-field select:focus,.sc-modal-field textarea:focus{border-color:var(--accent);}
   .sc-modal-field textarea{resize:vertical;min-height:72px;}
+  /* 確認・更新モーダルでの現場名の視認性向上：他の入力欄より大きく・太く表示 */
+  #sc-modalSiteInput{font-size:1.3rem;font-weight:700;padding:9px 12px;}
   .sc-modal-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:13px;}
   .sc-modal-row2 .sc-modal-field{margin-bottom:0;}
   .sc-modal-date-display{font-size:.82rem;color:var(--text-dim);padding:6px 10px;background:var(--surface2);border-radius:4px;border:1px solid var(--border);}
@@ -343,7 +361,7 @@
   /* TOOLTIP - 実スタイルは tooltip 自己挿入CSS（#sc-tooltip-css）側で定義 */
 
   /* TIMETABLE VIEW */
-  #schedule-root .tt-wrap{display:flex;flex-direction:column;height:100%;overflow:hidden;}
+  #schedule-root .tt-wrap{display:flex;flex-direction:column;height:calc(100% - 12px);overflow:hidden;}
   #schedule-root .tt-allday-row{display:flex;background:var(--surface);border-bottom:2px solid var(--border);min-height:28px;}
   #schedule-root .tt-time-gutter{width:52px;min-width:52px;border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:var(--text-dim);padding:0 4px;}
   #schedule-root .tt-allday-events{flex:1;display:flex;flex-wrap:wrap;gap:3px;padding:4px 6px;align-items:center;}
@@ -357,13 +375,13 @@
   #schedule-root .tt-days-area{display:flex;flex:1;}
   #schedule-root .tt-day-col{flex:1;border-right:1px solid var(--border);position:relative;min-width:0;}
   #schedule-root .tt-day-col:last-child{border-right:none;}
-  #schedule-root .tt-day-hdr{text-align:center;padding:4px 2px 3px;background:var(--surface2);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:3;}
-  #schedule-root .tt-day-hdr.tt-today{background:rgba(232,130,12,.12);border-bottom-color:var(--accent);}
+  #schedule-root .tt-day-hdr{text-align:center;padding:4px 2px 3px;background:var(--surface2);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:3;height:48px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  #schedule-root .tt-day-hdr.tt-today{background:rgba(232,130,12,.2);border-bottom-color:var(--accent);border-bottom-width:3px;}
   #schedule-root .tt-day-hdr.tt-sun .tt-dnum,.tt-day-hdr.tt-sun .tt-ddow{color:#e74c3c!important;}
   #schedule-root .tt-day-hdr.tt-sat .tt-dnum,.tt-day-hdr.tt-sat .tt-ddow{color:#5dade2!important;}
   #schedule-root .tt-ddow{font-size:.65rem;font-weight:700;color:var(--text-dim);}
   #schedule-root .tt-dnum{font-size:1.05rem;font-weight:700;color:var(--text);}
-  #schedule-root .tt-day-hdr.tt-today .tt-dnum{color:var(--accent);}
+  #schedule-root .tt-day-hdr.tt-today .tt-dnum{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff!important;font-size:1rem;font-weight:900;line-height:1;margin:0 auto;}
   #schedule-root .tt-grid{position:relative;}
   #schedule-root .tt-hslot{height:48px;border-bottom:1px solid rgba(128,128,128,.13);}
   #schedule-root .tt-hslot.tt-half{border-bottom:1px dashed rgba(128,128,128,.07);}
@@ -389,29 +407,85 @@
   #schedule-root .tt-ev.ext{background:repeating-linear-gradient(45deg,rgba(46,204,113,.2),rgba(46,204,113,.2) 4px,rgba(0,30,10,.25) 4px,rgba(0,30,10,.25) 8px)!important;border-left:3px solid #2ecc71!important;}
   #schedule-root .tt-allday-chip.ext{background:rgba(46,204,113,.2);border:1px solid #2ecc71;color:#27ae60;}
 
-  /* FULLSCREEN */
-  #schedule-root.sc-fullscreen{position:fixed!important;inset:0!important;z-index:9999!important;border-radius:0!important;height:100vh!important;}
-  #schedule-root.sc-fullscreen .sc-app{height:calc(100vh - 58px);}
+  /* 東京支店イベント（オレンジストライプ） */
+  #schedule-root .event-chip.tokyo{background:repeating-linear-gradient(45deg,rgba(232,130,12,.22),rgba(232,130,12,.22) 4px,transparent 4px,transparent 8px)!important;border-color:rgba(232,130,12,.7)!important;border-left-color:#e8820c!important;}
+  #schedule-root .event-chip.tokyo .ev-name{color:#e8820c!important;}
+  #schedule-root .day-event-card.tokyo{background:repeating-linear-gradient(45deg,rgba(232,130,12,.20),rgba(232,130,12,.20) 4px,transparent 4px,transparent 8px)!important;border-color:rgba(232,130,12,.7)!important;border-left-color:#e8820c!important;}
+  #schedule-root .day-event-card.tokyo .dec-name{color:#e8820c!important;}
+  #schedule-root .tt-ev.tokyo{background:repeating-linear-gradient(45deg,rgba(232,130,12,.30),rgba(232,130,12,.30) 4px,rgba(50,20,0,.25) 4px,rgba(50,20,0,.25) 8px)!important;border-left:3px solid #e8820c!important;}
+  #schedule-root .tt-allday-chip.tokyo{background:rgba(232,130,12,.2);border:1px solid #e8820c;color:#e8820c;}
 
-  /* Mobile */
+  /* FULLSCREEN
+   * 全画面表示中は#schedule-root自身にposition:fixed;inset:0を付けて
+   * 画面全体を覆う。重要なのは width:100vw / height:100vh を使わず、
+   * inset:0だけで覆っている点（top/right/bottom/leftを全て0にすると、
+   * ブラウザが「4辺の制約を満たすように」自動で幅・高さを物理的な
+   * 実ビューポートに合わせて確定してくれる）。
+   * 以前はwidth:100vw;height:100vhを使っていたが、zoomを併用すると
+   * vw/vh単位自体がzoom倍率の影響を受けてしまい（例：zoom:0.6中は
+   * width:100vwが画面幅の60%分しか埋まらない）、画面を覆いきれず
+   * 隙間からkintone本来のUIが露出する不具合があった。insetベースの
+   * 指定はvw/vh単位を使わないため、この問題が発生しない（実機検証済み）。
+   * これによりtransformによる見た目だけの縮小（縮小時に余白が残って
+   * しまう）をやめ、全画面中もCSSのzoomプロパティをそのまま使えるように
+   * なった。zoomは要素のレイアウト占有領域そのものを縮小・拡大するため、
+   * 縮小時は画面を埋め尽くしたまま、より多くの日数（行）が一画面に
+   * 収まるようになる（平野さんの本来の目的に合致する挙動。実機検証済み）。
+   * .sc-appの高さもvh基準ではなくroot自身の高さに対する%基準にして
+   * いる（vhは上記と同じ理由でzoomと相性が悪いため使わない）。 */
+  #schedule-root.sc-fullscreen{position:fixed;inset:0;z-index:9999;border-radius:0;}
+  #schedule-root.sc-fullscreen .sc-app{height:calc(100% - 58px);}
+
+  /* Mobile / 大型タッチディスプレイ（スマホ判定される環境含む） */
   @media(max-width:760px),(hover:none) and (pointer:coarse){
     #schedule-root .sc-app{grid-template-columns:1fr;height:auto;}
-    #schedule-root .sidebar{border-right:none;border-bottom:2px solid var(--border);padding:0;overflow:visible;}
+
+    /* 登録エリア＝左側からスライドインするドロワーに変更（横位置スマホ・大型ディスプレイ向け） */
+    #schedule-root .sidebar{
+      position:fixed;top:0;left:0;bottom:0;z-index:800;
+      width:85vw;max-width:340px;
+      border-right:2px solid var(--accent);border-bottom:none;
+      padding:0;overflow-y:auto;
+      transform:translateX(-100%);
+      transition:transform .25s ease;
+      box-shadow:6px 0 28px rgba(0,0,0,.5);
+    }
+    #schedule-root .sidebar.sidebar-open{transform:translateX(0);}
+
+    /* ドロワー上部バー（タップで閉じる） */
     #schedule-root .sidebar-toggle-bar{
       display:flex;justify-content:space-between;align-items:center;
       padding:10px 14px;background:var(--surface2);border:none;border-bottom:1px solid var(--border);
       width:100%;cursor:pointer;font-size:.9rem;font-weight:700;color:var(--accent);
       font-family:inherit;transition:background .2s;
+      position:sticky;top:0;z-index:2;
     }
     #schedule-root .sidebar-toggle-bar:active{background:var(--border);}
     #schedule-root .sidebar-toggle-bar .stb-caret{transition:transform .25s;}
     #schedule-root .sidebar.sidebar-open .sidebar-toggle-bar{border-bottom:2px solid var(--accent);}
     #schedule-root .sidebar.sidebar-open .sidebar-toggle-bar .stb-caret{transform:rotate(90deg);}
     #schedule-root .sidebar-inner{
-      display:none;flex-direction:column;gap:10px;padding:12px;
-      max-height:62vh;overflow-y:auto;
+      display:flex;flex-direction:column;gap:10px;padding:12px;
     }
-    #schedule-root .sidebar.sidebar-open .sidebar-inner{display:flex;}
+
+    /* 左端の常設タブ（閉じている間表示・タップで登録エリアを開く） */
+    #schedule-root .sc-sidebar-tab{
+      display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:center;
+      position:fixed;top:50%;left:0;transform:translateY(-50%);
+      z-index:550;
+      background:var(--accent);color:#fff;border:none;
+      border-radius:0 10px 10px 0;
+      padding:14px 7px;
+      font-size:.78rem;font-weight:700;line-height:1.3;
+      writing-mode:vertical-rl;text-orientation:mixed;letter-spacing:.05em;
+      box-shadow:3px 0 12px rgba(0,0,0,.4);
+      cursor:pointer;
+    }
+    #schedule-root .sc-sidebar-tab.hide{display:none!important;}
+
+    /* ドロワー背後のオーバーレイ（タップで閉じる） */
+    #schedule-root .sc-sidebar-overlay.open{display:block;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:790;}
+
     #schedule-root .cal-cell{min-height:75px;}
     #schedule-root .day-row{grid-template-columns:58px 1fr;}
     #schedule-root .day-label .dl-num{font-size:1.1rem;}
@@ -514,6 +588,33 @@
     transition:filter .15s;
   }
   #schedule-root .fab-modal-done:hover{filter:brightness(1.1);}
+
+  /* ===== 拡大縮小コントロール（閲覧専用ページのみ表示） ===== */
+  #schedule-root .sc-zoom-controls{
+    display:none;
+    position:fixed;top:50%;right:12px;transform:translateY(-50%);
+    z-index:550;flex-direction:column;gap:6px;
+    background:rgba(36,36,36,.92);border:1px solid var(--border);border-radius:24px;
+    padding:6px;box-shadow:0 4px 14px rgba(0,0,0,.4);
+  }
+  #schedule-root.viewer-mode .sc-zoom-controls{display:flex;}
+  @media(max-width:760px),(hover:none) and (pointer:coarse){
+    #schedule-root .sc-zoom-controls{display:flex;}
+  }
+  #schedule-root .sc-zoom-controls button{
+    width:38px;height:38px;border-radius:50%;
+    background:var(--surface);border:1px solid var(--border);color:var(--text);
+    font-size:1.2rem;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all .2s;-webkit-tap-highlight-color:transparent;
+  }
+  #schedule-root .sc-zoom-controls button:hover{background:var(--accent);border-color:var(--accent);color:#fff;}
+  #schedule-root .sc-zoom-controls button:active{transform:scale(.92);}
+  #schedule-root .sc-zoom-label{
+    font-size:.62rem;color:var(--text-dim);text-align:center;line-height:1;
+    cursor:pointer;padding:4px 0;user-select:none;
+  }
+  #schedule-root .sc-zoom-label:hover{color:var(--accent);}
   `;
 
   /* ====================================================================
@@ -601,7 +702,7 @@
           <div class="form-group"><label>終了日</label><input type="date" id="sc-formEndDate"></div>
         </div>
         <div class="form-group"><label>現場名 / 行事名</label><input type="text" id="sc-formSite" placeholder="〇〇工事・〇〇会議"></div>
-        <div class="form-row2">
+        <div class="form-row2 sc-time-row">
           <div class="form-group"><label>開始時間</label><input type="time" id="sc-formTime"></div>
           <div class="form-group"><label>終了時間 <span style="font-size:.62rem;color:var(--text-dim);">（空欄=+3h自動）</span></label><input type="time" id="sc-formEndTime"></div>
         </div>
@@ -611,6 +712,8 @@
       </div>
       </div><!-- /sidebar-inner -->
     </aside>
+    <button class="sc-sidebar-tab" id="sc-btnSidebarTab" type="button">📋 登録エリア</button>
+    <div class="sc-sidebar-overlay" id="sc-sidebarOverlay"></div>
     <main class="main" id="sc-mainArea"></main>
   </div>
 
@@ -629,13 +732,13 @@
       <div class="sc-modal-field"><label>📅 日付・期間</label><div class="sc-modal-date-display" id="sc-modalDateDisplay"></div></div>
       <div class="sc-modal-field"><label>現場名 / 行事名</label>
         <input type="text" id="sc-modalSiteInput" placeholder="現場名・行事名">
-        <div class="viewer-only sc-modal-date-display" id="sc-viewerSite" style="font-size:1rem;font-weight:700;"></div>
+        <div class="viewer-only sc-modal-date-display" id="sc-viewerSite" style="font-size:1.3rem;font-weight:700;"></div>
       </div>
       <div class="sc-modal-row2" id="sc-modalDateRow">
         <div class="sc-modal-field"><label>📅 開始日</label><input type="date" id="sc-modalStartDate"></div>
         <div class="sc-modal-field"><label>📅 終了日</label><input type="date" id="sc-modalEndDate"></div>
       </div>
-      <div class="sc-modal-row2" id="sc-modalTimeRow">
+      <div class="sc-modal-row2 sc-time-row" id="sc-modalTimeRow">
         <div class="sc-modal-field"><label>🕐 開始時間</label><input type="time" id="sc-modalTimeInput"></div>
         <div class="sc-modal-field"><label>🕐 終了時間 <span style="font-size:.62rem;color:var(--text-dim);">（空欄=+3h自動）</span></label><input type="time" id="sc-modalEndTimeInput"></div>
       </div>
@@ -737,6 +840,13 @@
       <button class="fab-modal-done" id="sc-fabDone" type="button">完了</button>
     </div>
   </div>
+
+  <!-- 拡大・縮小コントロール（閲覧専用ページのみ表示） -->
+  <div class="sc-zoom-controls" id="sc-zoomControls">
+    <button id="sc-zoomIn" type="button" title="拡大">＋</button>
+    <div class="sc-zoom-label" id="sc-zoomLabel" title="クリックで100%にリセット">100%</div>
+    <button id="sc-zoomOut" type="button" title="縮小">−</button>
+  </div>
   `;
 
   /* ====================================================================
@@ -769,11 +879,11 @@
     { id: 16, code: 'masuya',    name: '増谷',   org: 'サービス2課', color: '#2645ad' },
     { id: 17, code: 'matsuura',  name: '松浦',   org: 'サービス2課', color: '#0cb5e9' },
     { id: 18, code: 'nihira',    name: '二平',   org: '東京支店',    color: '#922b21' },
-    { id: 19, code: 'watanabe',  name: '渡邉',   org: '東京支店',    color: '#c0392b' },
-    { id: 20, code: 'akita',     name: '秋田',   org: '東京支店',    color: '#a93226' },
-    { id: 21, code: 'tanaka',    name: '田中',   org: '東京支店',    color: '#78281f' },
-    { id: 22, code: 'yonezawa',  name: '米澤',   org: '東京支店',    color: '#b03a2e' },
-    { id: 23, code: 'oka',       name: '岡',     org: '東京支店',    color: '#cb4335' },
+    { id: 19, code: 'watanabe',  name: '渡邉',   org: '東京支店',    color: '#1d69be' },
+    { id: 20, code: 'akita',     name: '秋田',   org: '東京支店',    color: '#93960b' },
+    { id: 21, code: 'tanaka',    name: '田中',   org: '東京支店',    color: '#740f7e' },
+    { id: 22, code: 'yonezawa',  name: '米澤',   org: '東京支店',    color: '#18ac98' },
+    { id: 23, code: 'oka',       name: '岡',     org: '東京支店',    color: '#da44da' },
   ];
   let staffIdCounter = STAFF.length;
   const ORGS = ['業務部','技術部','営業部','施工管理課','サービス1課','サービス2課','東京支店'];
@@ -869,6 +979,12 @@
   function visibleStaff() { return STAFF.filter(s => selectedOrgs.has(s.org)); }
   function isCorp(ev) { return ev.type === '会社行事'; }
   function isDeadline(ev) { return ev.type === '期日管理'; }
+  /* 最初のマグネットが東京支店メンバーかどうか判定 */
+  function isTokyoBranch(ev) {
+    if (!ev.staff || ev.staff.length === 0) return false;
+    var s = getStaff(ev.staff[0]);
+    return s && s.org === '東京支店';
+  }
 
   // 遅延ロード用ヘルパー
   function monthKey(y, m) { return `${y}-${pad(m + 1)}`; }
@@ -994,12 +1110,75 @@
       isFullscreen = false;
       if (btn) btn.textContent = '⛶';
     }
+    applyZoom(currentZoom); // ズーム表示を再適用（ラベル等の同期も含む）
   }
 
   // ESCキーで全画面解除
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && isFullscreen) toggleFullscreen();
   });
+
+  /* ====================================================================
+   * VIEWER ZOOM（閲覧専用ページの拡大縮小／大型ディスプレイ・スマホ用）
+   * ==================================================================== */
+  const ZOOM_KEY = 'sc-viewer-zoom';
+  const ZOOM_MIN = 0.6, ZOOM_MAX = 1.6, ZOOM_STEP = 0.1;
+  let currentZoom = 1.0;
+  try {
+    const savedZoom = parseFloat(localStorage.getItem(ZOOM_KEY));
+    if (!isNaN(savedZoom) && savedZoom >= ZOOM_MIN && savedZoom <= ZOOM_MAX) currentZoom = savedZoom;
+  } catch (e) {}
+
+  /* 平野さんからのご要望「ボタンを押したらChromeの拡大縮小と同じように
+   * 動いてほしい」を受けて、CSSのzoomプロパティ（ブラウザのページ拡大
+   * 縮小機能と同じ仕組み。Chrome/Edge系で標準サポート、対象機材
+   * （RICOHディスプレイ・スマホとも実ブラウザはChrome）では問題なく
+   * 動作する）に切り替えた。
+   *
+   * これまでのtransform:scale()方式は「見た目だけ」縮小するもので、
+   * 要素自身のレイアウト上の占有領域（高さ等）は変わらないため、縮小
+   * した分の余白（空白／黒い箱）が残ってしまい、それを埋めるために
+   * ラッパー要素のサイズをJSで毎回計算し直す、という複雑な補正が
+   * 必要だった。
+   *
+   * zoomプロパティは逆に「レイアウト上の占有領域そのもの」を倍率に
+   * 応じて縮小・拡大する（ブロック要素の場合、横幅は親要素の幅を
+   * 満たす挙動のため変化しないが、縦の高さは内容に応じて自然に縮む）。
+   * そのため、JS側でラッパーのサイズを計算したり、自身のwidth/heightを
+   * px固定したりする補正コードが一切不要になった。縮小すれば本当に
+   * その分だけ占有スペースが減り、kintone本来のページネーション等は
+   * 自然に詰まって表示される（実機DOMで確認済み。これは仕様として
+   * 許容する挙動）。
+   *
+   * 全画面表示（toggleFullscreen）との併用についての注意：
+   * 全画面中の#schedule-rootはposition:fixed;inset:0（vw/vh単位は
+   * 使わない）で画面を覆っているため、通常表示時と同じくrootに直接
+   * CSSのzoomプロパティを掛けるだけでよい（transformによる見た目だけ
+   * の縮小は使わない）。insetベースの全画面指定はzoom倍率の影響を
+   * 受けないため、縮小時も画面を埋め尽くしたまま、より多くの日数が
+   * 一画面に収まる（詳細はCSSのFULLSCREENセクションのコメント参照）。 */
+  function applyZoom(z) {
+    z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(z * 10) / 10));
+    currentZoom = z;
+    const root = document.getElementById('schedule-root');
+    if (root) {
+      root.style.zoom = Math.abs(z - 1) < 0.001 ? '' : String(z);
+    }
+    const lbl = document.getElementById('sc-zoomLabel');
+    if (lbl) lbl.textContent = Math.round(z * 100) + '%';
+    try { localStorage.setItem(ZOOM_KEY, String(z)); } catch (e) {}
+  }
+
+  function initViewerZoom() {
+    const btnIn  = document.getElementById('sc-zoomIn');
+    const btnOut = document.getElementById('sc-zoomOut');
+    const lbl    = document.getElementById('sc-zoomLabel');
+    if (btnIn)  btnIn.addEventListener('click', () => applyZoom(currentZoom + ZOOM_STEP));
+    if (btnOut) btnOut.addEventListener('click', () => applyZoom(currentZoom - ZOOM_STEP));
+    if (lbl)    lbl.addEventListener('click', () => applyZoom(1.0));
+    applyZoom(currentZoom);
+    window.addEventListener('resize', () => applyZoom(currentZoom));
+  }
 
   /* ====================================================================
    * kintone API
@@ -1297,6 +1476,9 @@
       endDate   : dateVal,
       site      : category + (cs ? ` (${cs.name})` : ''),
       startTime, endTime,
+      // 「休みの形式」(一日/AM/PM) を保持。表示時間が同じ「08:00」でも
+      // 全日休みと午前休みを見分けられるようにするため使用する。
+      restFormat: format,
       staff     : staffId !== null ? [staffId] : [],
       notes     : memo,
       type      : '会社行事',
@@ -1409,7 +1591,16 @@
       if (ev.startTime) {
         var timeStr = ev.startTime;
         var et = getEndTime(ev);
-        if (et) timeStr += ' 〜 ' + et;
+        if (et) {
+          var _tipNextDay = ev.endDate && ev.endDate !== ev.startDate && ev.endTime && ev.endTime < ev.startTime;
+          timeStr += ' 〜 ' + (_tipNextDay ? '翌' : '') + et;
+        }
+        // 申請アプリ参照（有給・振替休日など）は「全日／午前／午後」を明示する
+        // （開始時刻だけでは全日休みと午前休みが同じ「08:00」になり区別できないため）
+        if (ev.isExternal) {
+          var _lbl = ev.restFormat === 'AM' ? '午前' : ev.restFormat === 'PM' ? '午後' : '全日';
+          timeStr = _lbl + '（' + timeStr + '）';
+        }
         html += '<div class="tt-row"><span class="tt-label">🕐 時間</span><span class="tt-val">' + timeStr + '</span></div>';
       }
 
@@ -1751,16 +1942,31 @@
 
   function makeEvIcon(ev) { return isDeadline(ev) ? '⚠️' : (isCorp(ev) ? '🏢' : '🔧'); }
 
+  /* 申請アプリ参照（有給・振替休日など）の「全日／午前／午後」ラベル。
+   * 開始時間だけを見ると「08:00」が全日休みと午前休みの両方で同じ表示になり
+   * 区別できないため、「休みの形式」(restFormat) から明示的なラベルを返す。 */
+  function extLeaveLabel(ev) {
+    if (!ev.isExternal) return '';
+    if (ev.restFormat === 'AM') return '午前';
+    if (ev.restFormat === 'PM') return '午後';
+    return '全日';
+  }
+  /* チップ/カード用の短い時間表示テキスト（申請アプリ参照イベントはラベル付き） */
+  function evTimeLabel(ev) {
+    if (!ev.startTime) return '';
+    return ev.isExternal ? `🕐 ${extLeaveLabel(ev)}（${ev.startTime}）` : `🕐 ${ev.startTime}`;
+  }
+
   function makeEventChip(ev, dateStr) {
     const first = isFirstDay(ev, dateStr);
     const corp  = isCorp(ev);
     const deadline = isDeadline(ev);
     const chip  = document.createElement('div');
-    chip.className = `event-chip${corp ? ' corp' : ''}${deadline ? ' deadline' : ''}${ev.isExternal ? ' ext' : ''}${first ? '' : ' cont'}`;
+    chip.className = `event-chip${corp ? ' corp' : ''}${deadline ? ' deadline' : ''}${ev.isExternal ? ' ext' : (isTokyoBranch(ev) ? ' tokyo' : '')}${first ? '' : ' cont'}`;
     let html = `<div class="ev-name">${first ? makeEvIcon(ev) : '⟶'} ${ev.site}`;
     if (first && ev.endDate && ev.endDate !== ev.startDate) html += ` 〜${ev.endDate.slice(5)}`;
     html += '</div>';
-    if (first && ev.startTime) html += `<div class="ev-time">🕐 ${ev.startTime}</div>`;
+    if (first && ev.startTime) html += `<div class="ev-time">${evTimeLabel(ev)}</div>`;
     chip.innerHTML = html;
     const bd = document.createElement('div'); bd.className = 'ev-badges';
     ev.staff.forEach(sid => { const s = getStaff(sid); if (s) bd.appendChild(makeBadge(s)); });
@@ -1771,8 +1977,8 @@
   /* ====================================================================
    * TIMETABLE (週ビュー)
    * ==================================================================== */
-  const TT_START_H = 7;   // 表示開始時
-  const TT_END_H   = 21;  // 表示終了時
+  const TT_START_H = 0;   // 表示開始時
+  const TT_END_H   = 23;  // 表示終了時（0:00〜24:00 = 24スロット）
   const TT_H_PX    = 48;  // 1時間の高さ(px)
   const TT_DAYS    = 5;   // 表示日数
 
@@ -1811,7 +2017,7 @@
       dayEvs.forEach(ev => {
         const chip = document.createElement('div');
         const _dl = isDeadline(ev);
-        chip.className = `tt-allday-chip${ev.isExternal?' ext':_dl?' deadline':isCorp(ev)?' corp':''}`;
+        chip.className = `tt-allday-chip${ev.isExternal?' ext':(isTokyoBranch(ev)?' tokyo':(_dl?' deadline':isCorp(ev)?' corp':''))}`;
         // 色変数を選択（期日管理優先）
         const _vars = ev.isExternal
           ? { bg:'--ce-bg', bd:'--ce-border', cl:'--ce-color' }
@@ -1841,10 +2047,22 @@
 
     // 時間列
     const timeCol = document.createElement('div'); timeCol.className = 'tt-time-col';
+    // 曜日ヘッダー（tt-day-hdr）の高さ分スペーサーを追加してラベル位置を合わせる
+    const ttHdrSpacer = document.createElement('div');
+    ttHdrSpacer.style.height = TT_H_PX + 'px';
+    timeCol.appendChild(ttHdrSpacer);
     for (let h = TT_START_H; h <= TT_END_H; h++) {
       const lbl = document.createElement('div'); lbl.className = 'tt-hour-label';
       lbl.textContent = `${h}:00`; timeCol.appendChild(lbl);
     }
+    // 24:00 終端ラベル（グリッド底端に表示）
+    const endLbl = document.createElement('div');
+    endLbl.className = 'tt-hour-label';
+    endLbl.style.height = '0';
+    endLbl.style.overflow = 'visible';
+    endLbl.style.borderBottom = 'none';
+    endLbl.textContent = '24:00';
+    timeCol.appendChild(endLbl);
     scrollArea.appendChild(timeCol);
 
     // 日付列コンテナ
@@ -1878,17 +2096,42 @@
       // 重なり処理（同じ時間帯のイベントを横に並べる）
       const sorted = [...dayEvs].sort((a, b) => (a.startTime||'').localeCompare(b.startTime||''));
       const cols_layout = [];
+      const gridBottom = totalHours * TT_H_PX;
       sorted.forEach(ev => {
-        const y1 = timeToY(ev.startTime) || 0;
-        const et = getEndTime(ev) || ev.startTime;
-        const y2 = (timeToY(et) || y1) || (y1 + TT_H_PX);
+        // 複数日イベントの日またぎ対応
+        const isMultiDay  = ev.endDate && ev.endDate !== ev.startDate;
+        const isStartDate = ev.startDate === dateStr;
+        const isEndDate   = (ev.endDate || ev.startDate) === dateStr;
+
+        let y1, y2;
+        if (isMultiDay && isStartDate && !isEndDate) {
+          // 開始日：startTimeからグリッド底まで延伸
+          y1 = timeToY(ev.startTime) || 0;
+          y2 = gridBottom;
+        } else if (isMultiDay && !isStartDate && isEndDate) {
+          // 終了日：グリッド頭からendTimeまで。endTimeがTT_START_H以前なら非表示
+          const ey = ev.endTime ? timeToY(ev.endTime) : null;
+          if (ey === null || ey <= 0) return; // グリッド外なのでスキップ
+          y1 = 0;
+          y2 = ey;
+        } else if (isMultiDay && !isStartDate && !isEndDate) {
+          // 中間日：グリッド全体を埋める
+          y1 = 0;
+          y2 = gridBottom;
+        } else {
+          // 単一日：従来通り
+          y1 = timeToY(ev.startTime) || 0;
+          const et = getEndTime(ev) || ev.startTime;
+          y2 = (timeToY(et) || y1) || (y1 + TT_H_PX);
+        }
+
         let placed = false;
         for (let ci = 0; ci < cols_layout.length; ci++) {
           const last = cols_layout[ci][cols_layout[ci].length-1];
           const ly2 = last._y2;
-          if (y1 >= ly2) { cols_layout[ci].push({...ev, _y1:y1, _y2:Math.max(y2, y1+20)}); placed=true; break; }
+          if (y1 >= ly2) { cols_layout[ci].push({...ev, _y1:y1, _y2:Math.max(y2, y1+20), _dateStr:dateStr}); placed=true; break; }
         }
-        if (!placed) cols_layout.push([{...ev, _y1:y1, _y2:Math.max(y2, y1+20)}]);
+        if (!placed) cols_layout.push([{...ev, _y1:y1, _y2:Math.max(y2, y1+20), _dateStr:dateStr}]);
       });
 
       const totalCols = cols_layout.length || 1;
@@ -1899,7 +2142,7 @@
           const height = Math.max(ev._y2 - ev._y1, 20);
           const _evDl = isDeadline(ev);
           const evEl = document.createElement('div');
-          evEl.className = 'tt-ev' + (ev.isExternal?' ext':_evDl?' deadline':'');
+          evEl.className = 'tt-ev' + (ev.isExternal?' ext':(isTokyoBranch(ev)?' tokyo':(_evDl?' deadline':'')));
           evEl.style.top    = ev._y1 + 'px';
           evEl.style.height = height + 'px';
           evEl.style.left   = `calc(${left} + 2px)`;
@@ -1912,8 +2155,24 @@
             evEl.style.color      = `var(${_cl})`;
           }
           const et = getEndTime(ev) || ev.startTime;
+          // 複数日イベントの時間ラベル（開始日/終了日/中間日で表示切り替え）
+          const _isMultiDay  = ev.endDate && ev.endDate !== ev.startDate;
+          const _isStartDate = ev.startDate === ev._dateStr;
+          const _isEndDate   = (ev.endDate || ev.startDate) === ev._dateStr;
+          const _isNextDayEnd = _isMultiDay && ev.endTime && ev.endTime < ev.startTime;
+          let timeLabel;
+          if (_isMultiDay && _isStartDate && !_isEndDate) {
+            timeLabel = `${ev.startTime}〜翌→`;
+          } else if (_isMultiDay && !_isStartDate && _isEndDate) {
+            timeLabel = `→〜${et}`;
+          } else if (_isMultiDay && !_isStartDate && !_isEndDate) {
+            timeLabel = '(終日)';
+          } else {
+            const endSuffix = _isNextDayEnd ? '翌' : '';
+            timeLabel = `${ev.startTime}〜${endSuffix}${et}`;
+          }
           let html = `<div class="tt-ev-name">${_evDl ? '⚠️ ' : ''}${ev.site}</div>`;
-          html += `<div class="tt-ev-time">${ev.startTime}〜${et}</div>`;
+          html += `<div class="tt-ev-time">${ev.isExternal ? extLeaveLabel(ev) + ' ' : ''}${timeLabel}</div>`;
           evEl.innerHTML = html;
           if (height > 40) {
             const bdg = document.createElement('div'); bdg.className = 'tt-ev-bdg';
@@ -2058,11 +2317,11 @@
           const corp  = isCorp(ev);
           const deadline = isDeadline(ev);
           const card  = document.createElement('div');
-          card.className = `day-event-card${corp?' corp':''}${deadline?' deadline':''}${ev.isExternal?' ext':''}${first?'':' cont'}`;
+          card.className = `day-event-card${corp?' corp':''}${deadline?' deadline':''}${ev.isExternal?' ext':(isTokyoBranch(ev)?' tokyo':'')}${first?'':' cont'}`;
           let html = `<div class="dec-name">${first?makeEvIcon(ev):'⟶'} ${ev.site}`;
           if (first && ev.endDate && ev.endDate !== ev.startDate) html += ` 〜${ev.endDate.slice(5)}`;
           html += '</div>';
-          if (first && ev.startTime) html += `<div class="dec-time">🕐 ${ev.startTime}</div>`;
+          if (first && ev.startTime) html += `<div class="dec-time">${evTimeLabel(ev)}</div>`;
           card.innerHTML = html;
           const bd = document.createElement('div'); bd.className = 'dec-badges';
           ev.staff.forEach(sid => { const s = getStaff(sid); if (s) bd.appendChild(makeBadge(s)); });
@@ -2228,7 +2487,10 @@
       if (vTime) {
         if (ev.startTime) {
           let t = ev.startTime;
-          if (ev.endTime) t += ' 〜 ' + ev.endTime;
+          if (ev.endTime) {
+            const _vNextDay = ev.endDate && ev.endDate !== ev.startDate && ev.endTime < ev.startTime;
+            t += ' 〜 ' + (_vNextDay ? '翌' : '') + ev.endTime;
+          }
           vTime.textContent = t;
         } else {
           vTime.textContent = '時間指定なし';
@@ -2352,16 +2614,36 @@
       verifyCurrentView().catch(e => console.error('[verify]', e));
     });
 
-    /* サイドバー開閉トグル（モバイル用） */
+    /* サイドバー（登録エリア）開閉
+       モバイル／タッチ環境（大型タッチディスプレイ含む）では左からのスライドドロワーになる */
+    function openSidebarDrawer() {
+      document.getElementById('sc-sidebar').classList.add('sidebar-open');
+      const overlay = document.getElementById('sc-sidebarOverlay');
+      if (overlay) overlay.classList.add('open');
+      const tab = document.getElementById('sc-btnSidebarTab');
+      if (tab) tab.classList.add('hide');
+    }
+    function closeSidebarDrawer() {
+      document.getElementById('sc-sidebar').classList.remove('sidebar-open');
+      const overlay = document.getElementById('sc-sidebarOverlay');
+      if (overlay) overlay.classList.remove('open');
+      const tab = document.getElementById('sc-btnSidebarTab');
+      if (tab) tab.classList.remove('hide');
+    }
     document.getElementById('sc-btnSidebarToggle').addEventListener('click', function () {
       const sidebar = document.getElementById('sc-sidebar');
-      sidebar.classList.toggle('sidebar-open');
+      if (sidebar.classList.contains('sidebar-open')) closeSidebarDrawer(); else openSidebarDrawer();
     });
-    /* モバイル環境では最初から閉じた状態 */
+    const sidebarTabEl = document.getElementById('sc-btnSidebarTab');
+    if (sidebarTabEl) sidebarTabEl.addEventListener('click', openSidebarDrawer);
+    const sidebarOverlayEl = document.getElementById('sc-sidebarOverlay');
+    if (sidebarOverlayEl) sidebarOverlayEl.addEventListener('click', closeSidebarDrawer);
+
+    /* モバイル環境（タッチ）では最初から閉じた状態（左端タブをタップして開く） */
     if (isTouch || window.innerWidth <= 760) {
-      document.getElementById('sc-sidebar').classList.remove('sidebar-open');
+      closeSidebarDrawer();
     } else {
-      document.getElementById('sc-sidebar').classList.add('sidebar-open');
+      openSidebarDrawer();
     }
 
     /* 月切り替え（未ロード月は自動追加ロード） */
@@ -2573,6 +2855,17 @@
     document.getElementById('sc-quickModal').addEventListener('click', e => { if (e.target === document.getElementById('sc-quickModal')) closeQuickModal(); });
     document.getElementById('sc-quickSiteName').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('sc-btnQuickRegister').click(); });
 
+    /* 編集モーダル - 開始日を変更した際、終了日が開始日より前のままだと
+       保存時にエラーになり、カレンダーにも表示されなくなってしまうため、
+       開始日を終了日より後ろにずらした場合は終了日を自動的に開始日へ合わせる */
+    document.getElementById('sc-modalStartDate').addEventListener('change', () => {
+      const startInput = document.getElementById('sc-modalStartDate');
+      const endInput   = document.getElementById('sc-modalEndDate');
+      if (startInput.value && endInput.value && endInput.value < startInput.value) {
+        endInput.value = startInput.value;
+      }
+    });
+
     /* 編集モーダル - 保存後に閉じる */
     document.getElementById('sc-btnEventSave').addEventListener('click', async () => {
       if (modalEventId === null) return;
@@ -2645,6 +2938,9 @@
       document.getElementById('sc-btnViewMonth').classList.remove('active');
       document.getElementById('sc-btnViewWeek').classList.remove('active');
     }
+
+    /* 拡大縮小コントロール初期化（閲覧専用ページに加え、kintoneを直接スマホ/タッチ判定環境で開いた場合も有効） */
+    initViewerZoom();
 
     /* 初期描画 */
     renderOrgFilter();
