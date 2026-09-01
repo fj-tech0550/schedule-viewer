@@ -269,7 +269,8 @@
 
   /* DAILY LIST */
   #schedule-root .daily-view{display:flex;flex-direction:column;gap:3px;}
-  #schedule-root .month-separator{background:linear-gradient(135deg,var(--surface),var(--surface2));border:2px solid var(--accent);border-radius:4px;padding:8px 16px;text-align:center;font-size:1rem;font-weight:700;color:var(--accent);letter-spacing:.1em;margin:8px 0 4px;}
+  #schedule-root .month-section{display:flex;flex-direction:column;gap:3px;position:relative;}
+  #schedule-root .month-separator{background:linear-gradient(135deg,var(--surface),var(--surface2));border:2px solid var(--accent);border-radius:4px;padding:8px 16px;text-align:center;font-size:1rem;font-weight:700;color:var(--accent);letter-spacing:.1em;margin:8px 0 4px;position:sticky;top:0;z-index:6;}
   #schedule-root .month-separator.current-month{border-width:3px;font-size:1.15rem;}
   #schedule-root .day-row{display:grid;grid-template-columns:80px 1fr;background:var(--surface);border:1px solid var(--border);border-radius:4px;min-height:48px;overflow:hidden;transition:border-color .15s;}
   #schedule-root .day-row.today-row{border-color:var(--accent);border-width:2px;background:rgba(232,130,12,.09)!important;}
@@ -2335,10 +2336,11 @@
 
   /* 1ヶ月分の日付行を wrap に追加するヘルパー（renderDaily / 追記両用） */
   function appendMonthToDailyWrap(wrap, y, m) {
+    const section = document.createElement('div'); section.className = 'month-section';
     const sep = document.createElement('div');
     sep.className = `month-separator${(y===currentYear && m===currentMonth) ? ' current-month' : ''}`;
     sep.textContent = `${y}年 ${m + 1}月`;
-    wrap.appendChild(sep);
+    section.appendChild(sep);
 
     const dim = new Date(y, m + 1, 0).getDate();
     for (let d = 1; d <= dim; d++) {
@@ -2401,8 +2403,9 @@
       } else {
         row.addEventListener('click', () => { if (touchSelectedStaffId) onCellTouchClick(dateStr); });
       }
-      wrap.appendChild(row);
+      section.appendChild(row);
     }
+    wrap.appendChild(section);
   }
 
   /* センチネルを wrap 末尾に設置し、IntersectionObserver で翌月を追記する */
