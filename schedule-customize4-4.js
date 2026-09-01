@@ -51,6 +51,9 @@
       '--dl-color': '#ff3b3b',   // 期日管理イベント色（目立つ赤）
       '--dl-bg'   : 'rgba(255,59,59,.18)',
       '--dl-border': 'rgba(255,59,59,.55)',
+      '--holiday-color': '#ff6b5b', // 休日ハイライト色
+      '--holiday-bg'   : 'rgba(255,107,91,.16)',
+      '--sat-bg'       : 'rgba(93,173,226,.14)', // 土曜ハイライト背景
     },
     light: {
       '--bg'      : '#f2f2ef',
@@ -73,6 +76,9 @@
       '--dl-color': '#c0151c',   // 期日管理イベント色（ライト：濃い赤）
       '--dl-bg'   : 'rgba(192,21,28,.13)',
       '--dl-border': 'rgba(192,21,28,.5)',
+      '--holiday-color': '#c0392b', // 休日ハイライト色
+      '--holiday-bg'   : 'rgba(192,57,43,.12)',
+      '--sat-bg'       : 'rgba(93,173,226,.12)', // 土曜ハイライト背景
     }
   };
 
@@ -87,6 +93,7 @@
     --ev-color:#e8820c;--ev-bg:rgba(232,130,12,.15);--ev-border:rgba(232,130,12,.4);
     --ce-color:#5dade2;--ce-bg:rgba(93,173,226,.15);--ce-border:rgba(93,173,226,.4);
     --dl-color:#ff3b3b;--dl-bg:rgba(255,59,59,.18);--dl-border:rgba(255,59,59,.55);
+    --holiday-color:#ff6b5b;--holiday-bg:rgba(255,107,91,.16);--sat-bg:rgba(93,173,226,.14);
   }
   #schedule-root *,#schedule-root *::before,#schedule-root *::after{box-sizing:border-box;margin:0;padding:0;}
   #schedule-root{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:var(--bg);color:var(--text);border-radius:6px;overflow:hidden;transition:background .3s,color .3s;}
@@ -236,6 +243,9 @@
   #schedule-root .cal-cell.today .date-num{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff!important;font-size:.9rem;font-weight:900;line-height:1;}
   #schedule-root .sun-cell .date-num{color:#e74c3c;}
   #schedule-root .sat-cell .date-num{color:#5dade2;}
+  #schedule-root .cal-cell.holiday-cell:not(.today){background:var(--holiday-bg);}
+  #schedule-root .cal-cell.holiday-cell:not(.today) .date-num{color:var(--holiday-color);}
+  #schedule-root .cal-cell.sat-cell:not(.today){background:var(--sat-bg);}
   #schedule-root .cell-events{display:flex;flex-direction:column;gap:2px;}
 
   /* EVENT CHIPS - 工事現場 */
@@ -269,6 +279,9 @@
   #schedule-root .day-label .dl-dow{font-size:.65rem;font-weight:700;margin-top:2px;}
   #schedule-root .day-row.sun-row .dl-num,#schedule-root .day-row.sun-row .dl-dow{color:#e74c3c;}
   #schedule-root .day-row.sat-row .dl-num,#schedule-root .day-row.sat-row .dl-dow{color:#5dade2;}
+  #schedule-root .day-row.holiday-row:not(.today-row){background:var(--holiday-bg)!important;}
+  #schedule-root .day-row.holiday-row:not(.today-row) .dl-num,#schedule-root .day-row.holiday-row:not(.today-row) .dl-dow{color:var(--holiday-color);}
+  #schedule-root .day-row.sat-row:not(.today-row){background:var(--sat-bg)!important;}
   #schedule-root .day-row.today-row .dl-num{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff!important;font-size:1.35rem;font-weight:900;line-height:1;}
   #schedule-root .day-events{display:flex;flex-wrap:wrap;align-items:flex-start;gap:5px;padding:8px 10px;}
   #schedule-root .day-event-card{background:var(--ev-bg);border:1px solid var(--ev-border);border-left:3px solid var(--ev-color);border-radius:4px;padding:4px 8px;cursor:pointer;transition:filter .15s;min-width:140px;max-width:280px;}
@@ -379,6 +392,9 @@
   #schedule-root .tt-day-hdr.tt-today{background:rgba(232,130,12,.2);border-bottom-color:var(--accent);border-bottom-width:3px;}
   #schedule-root .tt-day-hdr.tt-sun .tt-dnum,.tt-day-hdr.tt-sun .tt-ddow{color:#e74c3c!important;}
   #schedule-root .tt-day-hdr.tt-sat .tt-dnum,.tt-day-hdr.tt-sat .tt-ddow{color:#5dade2!important;}
+  #schedule-root .tt-day-hdr.tt-holiday:not(.tt-today) .tt-dnum,#schedule-root .tt-day-hdr.tt-holiday:not(.tt-today) .tt-ddow{color:var(--holiday-color)!important;}
+  #schedule-root .tt-day-hdr.tt-holiday:not(.tt-today){background:var(--holiday-bg);}
+  #schedule-root .tt-day-hdr.tt-sat:not(.tt-today){background:var(--sat-bg);}
   #schedule-root .tt-ddow{font-size:.65rem;font-weight:700;color:var(--text-dim);}
   #schedule-root .tt-dnum{font-size:1.05rem;font-weight:700;color:var(--text);}
   #schedule-root .tt-day-hdr.tt-today .tt-dnum{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff!important;font-size:1rem;font-weight:900;line-height:1;margin:0 auto;}
@@ -954,6 +970,7 @@
   let refreshTimer = null, refreshSeconds = 0, refreshOn = false;
   let currentWeekStart = null;
   let externalEvents = [];
+  let holidaySet = new Set(); // 休日登録アプリ(159)の【日付】値を格納 ("YYYY-MM-DD")
   let selectedColor = COLOR_PALETTE[0];
   let isFullscreen = false;
 
@@ -966,6 +983,7 @@
   function getToday() { return new Date(); }
   const APP_ID = (() => { try { return kintone.app.getId(); } catch (e) { return 160; } })();
   const EXTERNAL_APP_ID = 69;
+  const HOLIDAY_APP_ID = 159; // 休日登録アプリ
   const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
   /* ====================================================================
@@ -1214,6 +1232,7 @@
       const appKey = String(params.app);
       if (appKey === String(APP_ID))          return { records: data.events    || [] };
       if (appKey === String(EXTERNAL_APP_ID)) return { records: data.externals || [] };
+      if (appKey === String(HOLIDAY_APP_ID))  return { records: data.holidays  || [] };
       return { records: [] };
     }
     return kintone.api(`/k/v1/${endpoint}`, method, params);
@@ -1308,6 +1327,7 @@
 
       // 申請アプリも同期取得
       await loadApplicationEventsRange(fromStr, toStr);
+      await loadHolidaysRange(fromStr, toStr);
 
       toLoad.forEach(({ y, m }) => loadedMonths.add(monthKey(y, m)));
       setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
@@ -1398,6 +1418,7 @@
     loadedMonths.clear();
     events = [];
     externalEvents = [];
+    holidaySet = new Set();
     dailyRenderEndOffset = 1;
 
     if (VIEWER_MODE) {
@@ -1415,6 +1436,7 @@
         events = (gasData.events || []).map(r => kintoneToEvent(r));
         externalEvents = (gasData.externals || []).map(r => mapExtRecord(r)).filter(Boolean)
           .sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+        holidaySet = new Set((gasData.holidays || []).map(r => mapHolidayDate(r)).filter(Boolean));
         // 全月をロード済みとマーク → 以降のナビで追加GAS呼び出しなし
         const td = getToday();
         for (let d = -36; d <= 36; d++) {
@@ -1504,6 +1526,30 @@
       console.log('[申請アプリ] 追加ロード件数:', newEvs.length, '累計:', externalEvents.length);
     } catch (e) {
       console.error('[申請アプリ] 取得失敗:', e);
+    }
+  }
+
+  /* ====================================================================
+   * 休日登録アプリ参照（アプリID:159）【日付】フィールドのみ取得
+   * ==================================================================== */
+  function mapHolidayDate(rec) {
+    return (rec['日付'] && rec['日付'].value) ? rec['日付'].value : null;
+  }
+
+  /* 範囲指定付き休日データ取得（loadMonthRange から呼ぶ） */
+  async function loadHolidaysRange(fromDate, toDate) {
+    try {
+      let query = '';
+      if (fromDate && toDate) query = `日付 >= "${fromDate}" and 日付 <= "${toDate}"`;
+      const recs = await fetchAllRecords(HOLIDAY_APP_ID, query, ['日付']);
+      let added = 0;
+      recs.forEach(r => {
+        const d = mapHolidayDate(r);
+        if (d && !holidaySet.has(d)) { holidaySet.add(d); added++; }
+      });
+      console.log('[休日登録アプリ] 追加ロード件数:', added, '累計:', holidaySet.size);
+    } catch (e) {
+      console.error('[休日登録アプリ] 取得失敗:', e);
     }
   }
 
@@ -2077,7 +2123,8 @@
 
       // ヘッダー
       const hdr = document.createElement('div');
-      hdr.className = 'tt-day-hdr' + (isToday?' tt-today':'') + (dow===0?' tt-sun':dow===6?' tt-sat':'');
+      const isHolidayHdr = holidaySet.has(dateStr) && dow !== 6; // 土曜は青を優先し祝日装飾を適用しない
+      hdr.className = 'tt-day-hdr' + (isToday?' tt-today':'') + (dow===0?' tt-sun':dow===6?' tt-sat':'') + (isHolidayHdr?' tt-holiday':'');
       hdr.innerHTML = `<div class="tt-ddow">${DAYS[dow]}</div><div class="tt-dnum">${d.getDate()}</div>`;
       col.appendChild(hdr);
 
@@ -2246,7 +2293,8 @@
       }
       const dateStr = toDateStr(y, m, d), dow = i % 7, isTodayCell = dateStr === todayStr();
       const cell = document.createElement('div');
-      cell.className = `cal-cell${!inMonth?' other-month':''}${isTodayCell?' today':''}${dow===0?' sun-cell':dow===6?' sat-cell':''}`;
+      const isHolidayCell = holidaySet.has(dateStr) && dow !== 6; // 土曜は青を優先し祝日装飾を適用しない
+      cell.className = `cal-cell${!inMonth?' other-month':''}${isTodayCell?' today':''}${dow===0?' sun-cell':dow===6?' sat-cell':''}${isHolidayCell?' holiday-cell':''}`;
       cell.dataset.date = dateStr;
       const dn = document.createElement('div'); dn.className = 'date-num'; dn.textContent = d; cell.appendChild(dn);
       const evWrap = document.createElement('div'); evWrap.className = 'cell-events';
@@ -2298,7 +2346,8 @@
       const dow = new Date(dateStr + 'T00:00:00').getDay();
       const isTodayRow = dateStr === todayStr();
       const row = document.createElement('div');
-      row.className = `day-row${dow===0?' sun-row':dow===6?' sat-row':''}${isTodayRow?' today-row':''}`;
+      const isHolidayRow = holidaySet.has(dateStr) && dow !== 6; // 土曜は青を優先し祝日装飾を適用しない
+      row.className = `day-row${dow===0?' sun-row':dow===6?' sat-row':''}${isTodayRow?' today-row':''}${isHolidayRow?' holiday-row':''}`;
       row.dataset.date = dateStr;
 
       const lbl = document.createElement('div'); lbl.className = 'day-label';
