@@ -632,6 +632,34 @@
     cursor:pointer;padding:4px 0;user-select:none;
   }
   #schedule-root .sc-zoom-label:hover{color:var(--accent);}
+  /* ERROR ALERT MODAL */
+  .sc-error-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:20000;align-items:center;justify-content:center;}
+  .sc-error-overlay.open{display:flex;animation:scFadeIn .18s ease;}
+  @keyframes scFadeIn{from{opacity:0;}to{opacity:1;}}
+  .sc-error-box{
+    background:#fff;
+    border:4px solid #c0392b;
+    border-radius:10px;
+    padding:28px 32px 22px;
+    min-width:300px;max-width:480px;width:90%;
+    box-shadow:0 0 0 6px rgba(192,57,43,.18),0 16px 48px rgba(0,0,0,.6);
+    text-align:center;
+    font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;
+    animation:scErrorShake .35s ease;
+  }
+  @keyframes scErrorShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-8px);}40%{transform:translateX(8px);}60%{transform:translateX(-5px);}80%{transform:translateX(5px);}}
+  .sc-error-icon{font-size:3rem;line-height:1;margin-bottom:10px;display:block;}
+  .sc-error-title{font-size:1.1rem;font-weight:900;color:#c0392b;margin-bottom:8px;letter-spacing:.04em;}
+  .sc-error-msg{font-size:.92rem;color:#333;margin-bottom:20px;line-height:1.6;white-space:pre-wrap;word-break:break-all;}
+  .sc-error-ok{
+    background:#c0392b;color:#fff;border:none;
+    border-radius:6px;padding:10px 40px;
+    font-size:.95rem;font-weight:700;cursor:pointer;
+    transition:background .2s;
+    font-family:inherit;
+  }
+  .sc-error-ok:hover{background:#a93226;}
+
   `;
 
   /* ====================================================================
@@ -1335,7 +1363,7 @@
     } catch (e) {
       console.error('range load error:', e);
       setSyncStatus('err', `取得失敗: ${e.message}`);
-      showToast(`⚠️ データ取得失敗: ${e.message}`);
+      showErrorAlert(`データ取得失敗:\n${e.message}`);
     } finally {
       isLoadingRange = false;
     }
@@ -1449,7 +1477,7 @@
       } catch (e) {
         console.error('GAS load error:', e);
         setSyncStatus('err', `取得失敗: ${e.message}`);
-        showToast(`⚠️ データ取得失敗: ${e.message}`);
+        showErrorAlert(`データ取得失敗:\n${e.message}`);
       } finally {
         hideLoading();
       }
@@ -1467,7 +1495,7 @@
     } catch (e) {
       console.error('kintone load error:', e);
       setSyncStatus('err', `取得失敗: ${e.message}`);
-      showToast(`⚠️ kintone取得失敗: ${e.message}`);
+      showErrorAlert(`kintone取得失敗:\n${e.message}`);
     } finally {
       hideLoading();
     }
@@ -1722,6 +1750,29 @@
     t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2800);
   }
 
+  function showErrorAlert(msg) {
+    let ov = document.getElementById('sc-error-overlay');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'sc-error-overlay';
+      ov.className = 'sc-error-overlay';
+      ov.innerHTML =
+        '<div class="sc-error-box">' +
+          '<span class="sc-error-icon">🚨</span>' +
+          '<div class="sc-error-title">エラーが発生しました</div>' +
+          '<div class="sc-error-msg" id="sc-error-msg-text"></div>' +
+          '<button class="sc-error-ok" id="sc-error-ok-btn">OK</button>' +
+        '</div>';
+      document.body.appendChild(ov);
+      document.getElementById('sc-error-ok-btn').addEventListener('click', () => {
+        ov.classList.remove('open');
+      });
+      ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
+    }
+    document.getElementById('sc-error-msg-text').textContent = msg;
+    ov.classList.add('open');
+  }
+
   /* ====================================================================
    * BADGE
    * ==================================================================== */
@@ -1779,7 +1830,7 @@
         setSyncStatus('busy', '同期中...');
         await updateKintone(ev);
         setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
-      } catch (err) { setSyncStatus('err', `更新失敗: ${err.message}`); showToast('⚠️ kintoneの更新に失敗しました'); }
+      } catch (err) { setSyncStatus('err', `更新失敗: ${err.message}`); showErrorAlert('kintoneの更新に失敗しました\nページを再読み込みして再度お試しください。'); }
     } else {
       showToast(`ℹ️ ${s ? s.name : ''}はすでに登録されています`); clearTouchSelection();
     }
@@ -2408,15 +2459,42 @@
     wrap.appendChild(section);
   }
 
+  /* 日別ビューの描画世代（再描画時に古いセンチネル処理を無効化するため） */
+  let dailyRenderGen = 0;
+  /* 日別ビューの自動追記上限（currentMonth + N ヶ月まで）。暴走時の安全装置 */
+  const DAILY_MAX_END_OFFSET = 12;
+
+  /* 日別ビューの実際のスクロールコンテナを判定する。
+   * PC では .main が overflow-y:auto の固定高さでスクロールするが、
+   * モバイル/タッチ環境の CSS では .sc-app が height:auto になるため
+   * .main は中身の高さまで伸びてしまい、スクロールしない（ページ全体が
+   * スクロールする）。この場合 .main を IntersectionObserver の root に
+   * すると、末尾センチネルが常に「見えている」判定になり、翌月の追記と
+   * データ取得が無限に続いてしまう（iPad/iPhone で読込が終わらない原因）。
+   * そのため .main が本当にスクロールできる時だけ .main を返し、
+   * それ以外は null（=ビューポート基準）を返す。 */
+  function getDailyScrollRoot(main) {
+    if (!main) return null;
+    const oy = window.getComputedStyle(main).overflowY;
+    const scrollable = (oy === 'auto' || oy === 'scroll') && main.scrollHeight > main.clientHeight + 1;
+    return scrollable ? main : null;
+  }
+
   /* センチネルを wrap 末尾に設置し、IntersectionObserver で翌月を追記する */
-  function attachDailySentinel(main, wrap) {
+  function attachDailySentinel(main, wrap, gen) {
     if (typeof IntersectionObserver === 'undefined') return;
+    if (gen !== dailyRenderGen) return;                       // 既に再描画済み
+    if (dailyRenderEndOffset >= DAILY_MAX_END_OFFSET) return; // 追記上限
     const sentinel = document.createElement('div');
     sentinel.style.cssText = 'height:2px;width:100%;';
     wrap.appendChild(sentinel);
 
+    let busy = false;
     const obs = new IntersectionObserver(async (entries) => {
-      if (!entries[0].isIntersecting || isLoadingRange) return;
+      if (!entries[0].isIntersecting || busy) return;
+      if (gen !== dailyRenderGen || !wrap.isConnected) { obs.disconnect(); return; }
+      if (isLoadingRange) return; // 他のロード中は次回の交差判定に任せる
+      busy = true;
       obs.disconnect();
       sentinel.remove();
 
@@ -2425,10 +2503,11 @@
       if (!isMonthLoaded(next.y, next.m)) {
         await loadMonthRange(next.y, next.m, next.y, next.m);
       }
+      if (gen !== dailyRenderGen || !wrap.isConnected) return; // ロード中に再描画された
       // DOM に追記するだけ（スクロール位置は変わらない）
       appendMonthToDailyWrap(wrap, next.y, next.m);
-      attachDailySentinel(main, wrap); // 次の末尾にセンチネルを再設置
-    }, { root: main, threshold: 0 });
+      attachDailySentinel(main, wrap, gen); // 次の末尾にセンチネルを再設置
+    }, { root: getDailyScrollRoot(main), threshold: 0 });
 
     obs.observe(sentinel);
   }
@@ -2436,6 +2515,7 @@
   function renderDaily() {
     const main = document.getElementById('sc-mainArea');
     if (!main) return;
+    const gen = ++dailyRenderGen;
     main.innerHTML = '';
     const wrap = document.createElement('div'); wrap.className = 'daily-view';
 
@@ -2444,13 +2524,28 @@
       appendMonthToDailyWrap(wrap, shifted.y, shifted.m);
     }
 
-    attachDailySentinel(main, wrap);
     main.appendChild(wrap);
 
-    // 今日の行にスクロール
+    // 今日の行にスクロール → スクロール確定後にセンチネルを設置
+    // （先に設置すると、スクロール前の位置でセンチネルが交差判定され
+    //   不要な追記が走ることがあるため）
     setTimeout(() => {
+      if (gen !== dailyRenderGen) return;
       const target = wrap.querySelector('.today-row') || wrap.querySelector(`[data-date="${toDateStr(currentYear, currentMonth, 1)}"]`);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (target) {
+        const separator = wrap.querySelector('.month-separator');
+        const headerH = separator ? separator.offsetHeight + 4 : 44;
+        if (getDailyScrollRoot(main)) {
+          // PC：.main 内でスクロール
+          const cRect = main.getBoundingClientRect();
+          const tRect = target.getBoundingClientRect();
+          main.scrollTop = main.scrollTop + tRect.top - cRect.top - headerH;
+        } else {
+          // モバイル：ページ（祖先要素）側をスクロール
+          try { target.scrollIntoView({ block: 'start' }); } catch (e) { target.scrollIntoView(true); }
+        }
+      }
+      setTimeout(() => attachDailySentinel(main, wrap, gen), 300);
     }, 50);
   }
 
@@ -2482,7 +2577,7 @@
         setSyncStatus('busy', '同期中...');
         await updateKintone(ev);
         setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
-      } catch (err) { setSyncStatus('err', `更新失敗: ${err.message}`); showToast('⚠️ kintoneの更新に失敗しました'); }
+      } catch (err) { setSyncStatus('err', `更新失敗: ${err.message}`); showErrorAlert('kintoneの更新に失敗しました\nページを再読み込みして再度お試しください。'); }
     } else {
       showToast(`ℹ️ ${s ? s.name : ''}はすでに登録されています`);
     }
@@ -2874,7 +2969,7 @@
         await saveToKintone(ev);
         setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
         showToast(`✅「${site}」をkintoneに保存しました`);
-      } catch (err) { setSyncStatus('err', `保存失敗: ${err.message}`); showToast('⚠️ kintoneへの保存に失敗しました'); }
+      } catch (err) { setSyncStatus('err', `保存失敗: ${err.message}`); showErrorAlert('kintoneへの保存に失敗しました\nページを再読み込みして再度お試しください。'); }
       finally { btn.disabled = false; btn.textContent = '登録する'; }
     });
 
@@ -2901,7 +2996,7 @@
         setSyncStatus('busy', '同期中...');
         await saveToKintone(ev);
         setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
-      } catch (err) { setSyncStatus('err', `保存失敗: ${err.message}`); showToast('⚠️ kintoneへの保存に失敗しました'); }
+      } catch (err) { setSyncStatus('err', `保存失敗: ${err.message}`); showErrorAlert('kintoneへの保存に失敗しました\nページを再読み込みして再度お試しください。'); }
     });
     document.getElementById('sc-btnQuickCancel').addEventListener('click', closeQuickModal);
     document.getElementById('sc-quickModal').addEventListener('click', e => { if (e.target === document.getElementById('sc-quickModal')) closeQuickModal(); });
@@ -2946,7 +3041,7 @@
         closeEventModal();
       } catch (err) {
         setSyncStatus('err', `更新失敗: ${err.message}`);
-        showToast('⚠️ kintoneの更新に失敗しました');
+        showErrorAlert('kintoneの更新に失敗しました\nページを再読み込みして再度お試しください。');
         btns.forEach(b => b.disabled = false);
       }
     });
@@ -2963,7 +3058,7 @@
           setSyncStatus('busy', '同期中...');
           await deleteFromKintone(ev.kintoneId);
           setSyncStatus('ok', `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`);
-        } catch (err) { setSyncStatus('err', `削除失敗: ${err.message}`); showToast('⚠️ kintoneからの削除に失敗しました'); }
+        } catch (err) { setSyncStatus('err', `削除失敗: ${err.message}`); showErrorAlert('kintoneからの削除に失敗しました\nページを再読み込みして再度お試しください。'); }
       }
     });
 
