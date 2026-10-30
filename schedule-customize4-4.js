@@ -30,55 +30,85 @@
    * THEME DEFINITIONS
    * ==================================================================== */
   const THEMES = {
+    /* ナイトモード：黒基調の淡い配色（ポータルのボタンと同じトーンを暗くしたもの） */
     dark: {
-      '--bg'      : '#1a1a1a',
-      '--surface' : '#242424',
-      '--surface2': '#2e2e2e',
-      '--border'  : '#444444',
-      '--accent'  : '#e8820c',
-      '--accent2' : '#c96a00',
-      '--text'    : '#e8e0d0',
-      '--text-dim': '#999999',
-      '--danger'  : '#c0392b',
-      '--success' : '#27ae60',
-      '--info'    : '#2980b9',
-      '--ev-color': '#e8820c',   // 工事現場イベント色
-      '--ev-bg'   : 'rgba(232,130,12,.15)',
-      '--ev-border': 'rgba(232,130,12,.4)',
-      '--ce-color': '#5dade2',   // 会社行事イベント色
-      '--ce-bg'   : 'rgba(93,173,226,.15)',
-      '--ce-border': 'rgba(93,173,226,.4)',
-      '--dl-color': '#ff3b3b',   // 期日管理イベント色（目立つ赤）
-      '--dl-bg'   : 'rgba(255,59,59,.18)',
-      '--dl-border': 'rgba(255,59,59,.55)',
-      '--holiday-color': '#ff6b5b', // 休日ハイライト色
-      '--holiday-bg'   : 'rgba(255,107,91,.16)',
-      '--sat-bg'       : 'rgba(93,173,226,.14)', // 土曜ハイライト背景
+      '--bg'      : '#16181b',
+      '--surface' : '#1e2125',
+      '--surface2': '#25292e',
+      '--border'  : '#343a41',
+      '--accent'  : '#d6a06a',
+      '--accent2' : '#c08a52',
+      '--text'    : '#e2e0dc',
+      '--text-dim': '#8e959e',
+      '--danger'  : '#d9605a',
+      '--success' : '#5c9a88',
+      '--info'    : '#5b86ad',
+      '--ev-color': '#d9a874',   // 工事現場（茶）
+      '--ev-bg'   : '#2a241d',
+      '--ev-border': '#463a2c',
+      '--ce-color': '#8fb4d6',   // 会社行事（青）
+      '--ce-bg'   : '#1d2630',
+      '--ce-border': '#33465a',
+      '--dl-color': '#ee8a82',   // 期日管理（赤）
+      '--dl-bg'   : '#2e1f1f',
+      '--dl-border': '#5a3431',
+      '--holiday-color': '#e07a70',
+      '--holiday-bg'   : '#241c1c',
+      '--sat-bg'       : '#1b222a',
+      /* 追加トークン */
+      '--sun'      : '#e07a70',
+      '--sat'      : '#7fb0dc',
+      '--today-bg' : '#2a2219',
+      '--sep-bg'   : '#231f1a',
+      '--sep-line' : '#4a3d2e',
+      '--ex-color' : '#8cc5b3',  // 申請アプリ（緑）
+      '--ex-bg'    : '#1d2926',
+      '--ex-bg2'   : '#192220',
+      '--ex-border': '#31493f',
+      '--tk-color' : '#e0a768',  // 東京支店（斜線）
+      '--tk-bg'    : '#2c251b',
+      '--tk-bg2'   : '#231e17',
+      '--tk-border': '#4d3e2b',
     },
+    /* DAYモード：白基調の淡い配色（ポータルのボタンと同じトーン） */
     light: {
-      '--bg'      : '#f2f2ef',
+      '--bg'      : '#f4f5f6',
       '--surface' : '#ffffff',
-      '--surface2': '#ebebeb',
-      '--border'  : '#d0d0cc',
-      '--accent'  : '#cc7000',
-      '--accent2' : '#a85800',
-      '--text'    : '#1a1a1a',
-      '--text-dim': '#666666',
+      '--surface2': '#f6f8fa',
+      '--border'  : '#e3e7e8',
+      '--accent'  : '#b9773a',
+      '--accent2' : '#a0632c',
+      '--text'    : '#333333',
+      '--text-dim': '#8a929e',
       '--danger'  : '#c0392b',
-      '--success' : '#1a7a3f',
-      '--info'    : '#1a5276',
-      '--ev-color': '#cc7000',
-      '--ev-bg'   : 'rgba(204,112,0,.12)',
-      '--ev-border': 'rgba(204,112,0,.45)',
-      '--ce-color': '#1a5276',
-      '--ce-bg'   : 'rgba(26,82,118,.12)',
-      '--ce-border': 'rgba(26,82,118,.4)',
-      '--dl-color': '#c0151c',   // 期日管理イベント色（ライト：濃い赤）
-      '--dl-bg'   : 'rgba(192,21,28,.13)',
-      '--dl-border': 'rgba(192,21,28,.5)',
-      '--holiday-color': '#c0392b', // 休日ハイライト色
-      '--holiday-bg'   : 'rgba(192,57,43,.12)',
-      '--sat-bg'       : 'rgba(93,173,226,.12)', // 土曜ハイライト背景
+      '--success' : '#3f7d6c',
+      '--info'    : '#3f6a91',
+      '--ev-color': '#9a6a33',
+      '--ev-bg'   : '#f4ece0',
+      '--ev-border': '#e8d9c3',
+      '--ce-color': '#3f6a91',
+      '--ce-bg'   : '#e6eef5',
+      '--ce-border': '#d2dfeb',
+      '--dl-color': '#c23b33',
+      '--dl-bg'   : '#fbecea',
+      '--dl-border': '#f1c9c5',
+      '--holiday-color': '#c94b40',
+      '--holiday-bg'   : '#fcf0ef',
+      '--sat-bg'       : '#f1f6fb',
+      /* 追加トークン */
+      '--sun'      : '#c94b40',
+      '--sat'      : '#3f7fb5',
+      '--today-bg' : '#fbf4ea',
+      '--sep-bg'   : '#fbf4ea',
+      '--sep-line' : '#ecd9c1',
+      '--ex-color' : '#3f7d6c',
+      '--ex-bg'    : '#e4f0ec',
+      '--ex-bg2'   : '#f3f8f6',
+      '--ex-border': '#cfe3dc',
+      '--tk-color' : '#b8732c',
+      '--tk-bg'    : '#f6efe3',
+      '--tk-bg2'   : '#fbf7f0',
+      '--tk-border': '#ead8bf',
     }
   };
 
@@ -660,7 +690,41 @@
   }
   .sc-error-ok:hover{background:#a93226;}
 
-  `;
+  
+  /* ====================================================================
+   * 淡い配色の上書き（DAY／ナイト共通。色は THEMES のトークンで切り替え）
+   * ==================================================================== */
+  #schedule-root header{background:var(--surface);border-bottom:2px solid var(--sep-line,var(--accent));}
+  #schedule-root .title-block h1{text-shadow:none;}
+  #schedule-root .badge{border:none;box-shadow:0 1px 2px rgba(0,0,0,.15);}
+  #schedule-root .ev-badges .badge,#schedule-root .dec-badges .badge,#schedule-root .tt-ev-bdg .badge,#schedule-root .tt-ad-badges .badge{box-shadow:none;}
+  /* 曜日・今日 */
+  #schedule-root .cal-dow.sun,#schedule-root .sun-cell .date-num,#schedule-root .day-row.sun-row .dl-num,#schedule-root .day-row.sun-row .dl-dow,#schedule-root .tt-day-hdr.tt-sun .tt-dnum,#schedule-root .tt-day-hdr.tt-sun .tt-ddow{color:var(--sun)!important;}
+  #schedule-root .cal-dow.sat,#schedule-root .sat-cell .date-num,#schedule-root .day-row.sat-row .dl-num,#schedule-root .day-row.sat-row .dl-dow,#schedule-root .tt-day-hdr.tt-sat .tt-dnum,#schedule-root .tt-day-hdr.tt-sat .tt-ddow{color:var(--sat)!important;}
+  #schedule-root .cal-cell.today{background:var(--today-bg);border-width:2px;}
+  #schedule-root .day-row.today-row{background:var(--today-bg)!important;}
+  #schedule-root .tt-day-hdr.tt-today{background:var(--today-bg);}
+  #schedule-root .cal-cell.drag-over,#schedule-root .day-row.drag-over{background:var(--today-bg);}
+  #schedule-root .day-row{border-radius:8px;}
+  #schedule-root .month-separator{background:var(--sep-bg);border:1px solid var(--sep-line);border-radius:8px;box-shadow:0 2px 0 var(--bg);}
+  #schedule-root .month-separator.current-month{border-width:1px;}
+  /* 予定カード */
+  #schedule-root .event-chip,#schedule-root .day-event-card{border-radius:6px;}
+  #schedule-root .day-event-card:hover{filter:none;box-shadow:0 3px 10px rgba(0,0,0,.12);}
+  #schedule-root .event-chip.deadline,#schedule-root .day-event-card.deadline,#schedule-root .tt-ev.deadline,#schedule-root .tt-allday-chip.deadline{animation:none!important;box-shadow:none!important;border-width:1px!important;border-left-width:4px!important;}
+  #schedule-root .day-event-card.deadline::before,#schedule-root .event-chip.deadline::before{background:var(--dl-color);box-shadow:none;border-radius:99px;}
+  #schedule-root .event-chip.ext,#schedule-root .day-event-card.ext,#schedule-root .tt-ev.ext{background:repeating-linear-gradient(45deg,var(--ex-bg),var(--ex-bg) 5px,var(--ex-bg2) 5px,var(--ex-bg2) 10px)!important;border:1px solid var(--ex-border)!important;border-left:3px solid var(--ex-color)!important;color:var(--ex-color)!important;}
+  #schedule-root .event-chip.ext .ev-name,#schedule-root .day-event-card.ext .dec-name{color:var(--ex-color)!important;}
+  #schedule-root .tt-allday-chip.ext{background:var(--ex-bg)!important;border:1px solid var(--ex-border)!important;border-left:3px solid var(--ex-color)!important;color:var(--ex-color)!important;}
+  #schedule-root .event-chip.tokyo,#schedule-root .day-event-card.tokyo,#schedule-root .tt-ev.tokyo{background:repeating-linear-gradient(45deg,var(--tk-bg),var(--tk-bg) 5px,var(--tk-bg2) 5px,var(--tk-bg2) 10px)!important;border:1px solid var(--tk-border)!important;border-left:3px solid var(--tk-color)!important;color:var(--tk-color)!important;}
+  #schedule-root .event-chip.tokyo .ev-name,#schedule-root .day-event-card.tokyo .dec-name{color:var(--tk-color)!important;}
+  #schedule-root .tt-allday-chip.tokyo{background:var(--tk-bg)!important;border:1px solid var(--tk-border)!important;border-left:3px solid var(--tk-color)!important;color:var(--tk-color)!important;}
+  #schedule-root .tt-ev{border-color:transparent;}
+  /* 小物 */
+  #schedule-root .sync-status.busy,#schedule-root .touch-hint{background:var(--today-bg);}
+  .sc-modal{border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.25);}
+  #sc-tooltip{border:1px solid var(--border)!important;border-top:3px solid var(--accent)!important;border-radius:8px!important;box-shadow:0 8px 24px rgba(0,0,0,.2)!important;}
+`;
 
   /* ====================================================================
    * HTML TEMPLATE
