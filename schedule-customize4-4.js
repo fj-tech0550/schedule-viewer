@@ -738,8 +738,8 @@
     </div>
     <div class="header-controls">
       <div class="view-toggle">
-        <button class="view-btn active" id="sc-btnViewMonth">📅 月</button>
-        <button class="view-btn"        id="sc-btnViewDay">📋 日別</button>
+        <button class="view-btn"        id="sc-btnViewMonth">📅 月</button>
+        <button class="view-btn active" id="sc-btnViewDay">📋 日別</button>
         <button class="view-btn"        id="sc-btnViewWeek">🕐 週</button>
       </div>
       <div class="refresh-area">
@@ -3142,9 +3142,10 @@
     document.getElementById('sc-btnStaffClose').addEventListener('click', () => document.getElementById('sc-staffModal').classList.remove('open'));
     document.getElementById('sc-staffModal').addEventListener('click', e => { if (e.target === document.getElementById('sc-staffModal')) document.getElementById('sc-staffModal').classList.remove('open'); });
 
-    /* 閲覧モード時は日別ビューをデフォルトに */
-    if (VIEWER_MODE) {
+    /* 日別ビューをデフォルトに（閲覧モードも通常モードも） */
+    {
       currentView = 'day';
+      dailyRenderEndOffset = 1;
       document.getElementById('sc-btnViewDay').classList.add('active');
       document.getElementById('sc-btnViewMonth').classList.remove('active');
       document.getElementById('sc-btnViewWeek').classList.remove('active');
