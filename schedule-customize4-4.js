@@ -1606,7 +1606,7 @@
   /* 範囲指定付き申請アプリ取得（loadMonthRange から呼ぶ） */
   async function loadApplicationEventsRange(fromDate, toDate) {
     try {
-      const targetValues = '"有給","振替休日","夏季休暇","特別休暇","土曜出勤"';
+      const targetValues = '"有給","公休日","振替休日","夏季休暇","特別休暇","土曜出勤"';
       let query = `非当番 in (${targetValues})`;
       if (fromDate && toDate) query += ` and 日付選択用 >= "${fromDate}" and 日付選択用 <= "${toDate}"`;
       const recs = await fetchAllRecords(
@@ -2104,7 +2104,7 @@
 
   function makeEvIcon(ev) { return isDeadline(ev) ? '⚠️' : (isCorp(ev) ? '🏢' : '🔧'); }
 
-  /* 申請アプリ参照（有給・振替休日など）の「全日／午前／午後」ラベル。
+  /* 申請アプリ参照（有給・公休日・振替休日など）の「全日／午前／午後」ラベル。
    * 開始時間だけを見ると「08:00」が全日休みと午前休みの両方で同じ表示になり
    * 区別できないため、「休みの形式」(restFormat) から明示的なラベルを返す。 */
   function extLeaveLabel(ev) {
